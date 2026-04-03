@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kandiga OG Image Preview</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: #111;
+      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+    }
+
+    .og-card {
+      width: 1200px;
+      height: 630px;
+      background: linear-gradient(145deg, #06060b 0%, #0a0a18 40%, #0d0d1a 70%, #06060b 100%);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 60px 80px;
+    }
+
+    /* Subtle circuit pattern background */
+    .og-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 20% 30%, rgba(34, 211, 238, 0.04) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(129, 140, 248, 0.03) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    /* Grid lines */
+    .og-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(34, 211, 238, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34, 211, 238, 0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+    }
+
+    .content {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+    }
+
+    .logo-text {
+      font-family: 'Courier New', monospace;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 12px;
+      text-transform: uppercase;
+      color: #22d3ee;
+      margin-bottom: 40px;
+      text-shadow: 0 0 40px rgba(34, 211, 238, 0.3), 0 0 80px rgba(34, 211, 238, 0.1);
+    }
+
+    .main-text {
+      font-size: 56px;
+      font-weight: 700;
+      color: #eef0f4;
+      line-height: 1.15;
+      letter-spacing: -1.5px;
+      margin-bottom: 24px;
+    }
+
+    .main-text .highlight {
+      color: #22d3ee;
+    }
+
+    .sub-text {
+      font-size: 22px;
+      color: #5b6078;
+      line-height: 1.5;
+      margin-bottom: 32px;
+      font-weight: 400;
+    }
+
+    .stats-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+      font-size: 17px;
+      color: #5b6078;
+    }
+
+    .stats-row .dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #22d3ee;
+      opacity: 0.5;
+    }
+
+    .stats-row .stat-value {
+      color: #c8ccd4;
+    }
+
+    /* Glow line at top */
+    .glow-top {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #22d3ee, transparent);
+      opacity: 0.4;
+    }
+
+    /* Glow line at bottom */
+    .glow-bottom {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 400px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #22d3ee, transparent);
+      opacity: 0.2;
+    }
+
+    .instructions {
+      margin-top: 40px;
+      color: #666;
+      font-size: 14px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="og-card">
+      <div class="glow-top"></div>
+      <div class="glow-bottom"></div>
+
+      <div class="content">
+        <div class="logo-text">Kandiga</div>
+
+        <div class="main-text">
+          122B Parameters. <span class="highlight">2.7GB RAM.</span><br />
+          One Mac.
+        </div>
+
+        <div class="sub-text">
+          35B brain + 122B reasoning + 4B routing = 5.5GB total
+        </div>
+
+        <div class="stats-row">
+          <span class="stat-value">95% accuracy</span>
+          <span class="dot"></span>
+          <span class="stat-value">44 turns</span>
+          <span class="dot"></span>
+          <span class="stat-value">3s per turn</span>
+        </div>
+      </div>
+    </div>
+
+    <p class="instructions">
+      Screenshot the card above at 1200x630px and save as <code>og-image.png</code>
+    </p>
+  </div>
+</body>
+</html>

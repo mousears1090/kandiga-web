@@ -9,9 +9,11 @@ export default function Footer() {
           </h3>
           <div className="flex flex-wrap justify-center gap-3">
             {[
+              { name: 'Qwen3 4B', status: 'default' },
               { name: 'Qwen3.5-35B-A3B', status: 'default' },
               { name: 'Qwen3.5-122B-A10B', status: 'default' },
-              { name: 'Qwen3.5-397B-A17B', status: 'default' },
+              { name: 'Gemma 4 26B-A4B', status: 'default' },
+              { name: 'Qwen3.5-397B-A17B', status: 'coming' },
               { name: 'Any MoE model', status: 'planned' },
             ].map((m, i) => (
               <span key={i} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--card-border)] bg-[var(--card)] text-xs">

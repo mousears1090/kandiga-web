@@ -67,11 +67,10 @@ export default function Hero() {
       {/* Headline */}
       <div className={`transition-all duration-700 delay-300 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
         <p className="text-xl sm:text-2xl md:text-3xl font-medium text-[var(--text-bright)] mb-4 tracking-tight">
-          Giant models. <span className="text-[var(--cyan)]">Tiny memory.</span>
+          Run 35B-122B AI models in under 3GB. <span className="text-[var(--cyan)]">Three models. One Mac.</span>
         </p>
-        <p className="text-base md:text-lg text-[var(--text-muted)] max-w-lg mx-auto leading-relaxed">
-          Run 35B–397B MoE models on any Mac with Selective Expert Materialization.
-          No cloud. No API keys. No compromises.
+        <p className="text-base md:text-lg text-[var(--text-muted)] max-w-xl mx-auto leading-relaxed">
+          Kandiga runs a 4B router + 35B brain + 122B reasoning engine simultaneously on a 16GB Mac Mini — all in 5.5GB of GPU. 95% accuracy on 44-turn conversations.
         </p>
       </div>
 

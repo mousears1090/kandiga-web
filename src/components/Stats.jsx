@@ -29,52 +29,61 @@ function AnimatedNumber({ value, suffix = '', duration = 1500 }) {
 }
 
 const stats = [
-  { value: 397, suffix: 'B', label: 'Largest model', sub: 'Qwen3.5-397B on any Mac' },
-  { value: 13, suffix: 'x', label: 'RAM reduction', sub: '20GB → 2GB for 35B model' },
-  { value: 6.5, suffix: ' t/s', label: 'Decode speed', sub: '35B K=4 on Apple M4' },
-  { value: 5.5, suffix: 'x', label: 'Prefill speedup', sub: 'Custom Metal GPU kernels' },
+  { value: 95, suffix: '%', label: 'Accuracy', sub: '44-turn multi-turn conversation' },
+  { value: 8.1, suffix: ' t/s', label: '35B MoE speed', sub: '3-bit quantization on M4' },
+  { value: 2.7, suffix: ' GB', label: '122B GPU RAM', sub: 'Down from 70GB standard' },
+  { value: 3.1, suffix: 's', label: 'Avg per turn', sub: 'Persistent KV cache' },
 ]
 
 const rows = [
-  { label: 'Model', col1: 'Qwen3.5-35B', col2: 'Qwen3.5-122B', col3: 'Qwen3.5-397B' },
-  { label: 'Parameters', col1: '35B (3B active)', col2: '122B (10B active)', col3: '397B (17B active)' },
-  { label: 'Experts', col1: '256 total, 8 active', col2: '256 total, 8 active', col3: '512 total, 10 active' },
-  { label: 'Disk', col1: '20 GB', col2: '70 GB', col3: '224 GB' },
-  { label: 'Standard RAM', col1: '20 GB', col2: '70 GB', col3: '224 GB' },
-  { label: 'Kandiga RAM', col1: '~2 GB', col2: '~4 GB', col3: '~8 GB', highlight: true },
-  { label: 'Min. Mac', col1: '8 GB', col2: '16 GB', col3: '24 GB', highlight: true },
+  { label: 'Model', col1: 'Qwen3 4B', col2: 'Qwen3.5-35B MoE', col3: 'Qwen3.5-122B MoE', col4: 'Gemma 4 26B MoE' },
+  { label: 'Parameters', col1: '4B (dense)', col2: '35B (3B active)', col3: '122B (10B active)', col4: '26B (4B active)' },
+  { label: 'Quantization', col1: '3-bit', col2: '3-bit', col3: '3-bit', col4: '4-bit' },
+  { label: 'Speed', col1: '31 tok/s', col2: '8.1 tok/s', col3: '2.2 tok/s', col4: '7.1 tok/s' },
+  { label: 'Standard RAM', col1: '2.4 GB', col2: '20 GB', col3: '70 GB', col4: '16 GB' },
+  { label: 'Kandiga RAM', col1: '1.8 GB', col2: '1.0 GB', col3: '2.7 GB', col4: '1.35 GB', highlight: true },
 ]
 
 const models = [
   {
-    name: 'Qwen3.5-35B',
+    name: 'Qwen3 4B',
+    sub: 'Dense · Router & tool calling',
+    specs: [
+      { label: 'Speed', value: '31 tok/s' },
+      { label: 'RAM', value: '1.8 GB', good: true },
+      { label: 'Quant', value: '3-bit' },
+      { label: 'Role', value: 'Router' },
+    ],
+  },
+  {
+    name: 'Qwen3.5-35B MoE',
     sub: '3B active · 256 experts',
     specs: [
-      { label: 'Disk', value: '20 GB' },
-      { label: 'RAM', value: '~2 GB', good: true },
-      { label: 'Speed', value: '3.4–6.5 t/s' },
-      { label: 'Min. Mac', value: '8 GB' },
+      { label: 'Speed', value: '8.1 tok/s' },
+      { label: 'RAM', value: '1.0 GB', good: true },
+      { label: 'Quant', value: '3-bit' },
+      { label: 'Role', value: 'Brain' },
     ],
   },
   {
-    name: 'Qwen3.5-122B',
+    name: 'Qwen3.5-122B MoE',
     sub: '10B active · 256 experts',
-    specs: [
-      { label: 'Disk', value: '70 GB' },
-      { label: 'RAM', value: '~4 GB', good: true },
-      { label: 'Speed', value: '~2 t/s' },
-      { label: 'Min. Mac', value: '16 GB' },
-    ],
-  },
-  {
-    name: 'Qwen3.5-397B',
-    sub: '17B active · 512 experts',
     featured: true,
     specs: [
-      { label: 'Disk', value: '224 GB' },
-      { label: 'RAM', value: '~8 GB', good: true },
-      { label: 'Speed', value: '~1 t/s' },
-      { label: 'Min. Mac', value: '24 GB' },
+      { label: 'Speed', value: '2.2 tok/s' },
+      { label: 'RAM', value: '2.7 GB', good: true },
+      { label: 'Quant', value: '3-bit' },
+      { label: 'Role', value: 'Reasoner' },
+    ],
+  },
+  {
+    name: 'Gemma 4 26B MoE',
+    sub: '4B active · 128 experts · Day-one support',
+    specs: [
+      { label: 'Speed', value: '7.1 tok/s' },
+      { label: 'RAM', value: '1.35 GB', good: true },
+      { label: 'Quant', value: '4-bit' },
+      { label: 'Role', value: 'General' },
     ],
   },
 ]
@@ -96,9 +105,9 @@ export default function Stats() {
       </div>
 
       <h3 className="text-lg font-semibold text-[var(--text-bright)] mb-2">Supported models</h3>
-      <p className="text-sm text-[var(--text-muted)] mb-5">Pick a model that fits your Mac. Kandiga handles the rest.</p>
+      <p className="text-sm text-[var(--text-muted)] mb-5">Four models, three running simultaneously. Pick what fits your Mac.</p>
 
-      {/* Mobile: 3 model cards stacked */}
+      {/* Mobile: model cards stacked */}
       <div className="flex flex-col gap-4 md:hidden">
         {models.map((m, i) => (
           <div key={i} className={`rounded-xl p-4 border ${m.featured
@@ -133,9 +142,10 @@ export default function Stats() {
           <thead>
             <tr className="border-b border-[var(--card-border)]">
               <th className="pb-3 text-left text-[var(--text-muted)] font-medium"></th>
+              <th className="pb-3 text-left text-[var(--text-bright)] font-medium">Qwen3 4B</th>
               <th className="pb-3 text-left text-[var(--text-bright)] font-medium">Qwen3.5-35B</th>
-              <th className="pb-3 text-left text-[var(--text-bright)] font-medium">Qwen3.5-122B</th>
-              <th className="pb-3 text-left text-[var(--cyan)] font-medium">Qwen3.5-397B</th>
+              <th className="pb-3 text-left text-[var(--cyan)] font-medium">Qwen3.5-122B</th>
+              <th className="pb-3 text-left text-[var(--text-bright)] font-medium">Gemma 4 26B</th>
             </tr>
           </thead>
           <tbody>
@@ -145,6 +155,7 @@ export default function Stats() {
                 <td className="py-3 text-[var(--text)]">{row.col1}</td>
                 <td className="py-3 text-[var(--text)]">{row.col2}</td>
                 <td className={`py-3 font-medium ${row.highlight ? 'text-[var(--cyan)]' : 'text-[var(--text-bright)]'}`}>{row.col3}</td>
+                <td className="py-3 text-[var(--text)]">{row.col4}</td>
               </tr>
             ))}
           </tbody>
