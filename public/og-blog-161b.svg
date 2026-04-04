@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" style="stop-color:#0a0a0f"/>
+      <stop offset="50%" style="stop-color:#0d1117"/>
+      <stop offset="100%" style="stop-color:#0a0e1a"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Subtle grid -->
+  <g opacity="0.025" stroke="#22d3ee" stroke-width="0.5">
+    <line x1="100" y1="0" x2="100" y2="630"/><line x1="200" y1="0" x2="200" y2="630"/>
+    <line x1="300" y1="0" x2="300" y2="630"/><line x1="400" y1="0" x2="400" y2="630"/>
+    <line x1="500" y1="0" x2="500" y2="630"/><line x1="600" y1="0" x2="600" y2="630"/>
+    <line x1="700" y1="0" x2="700" y2="630"/><line x1="800" y1="0" x2="800" y2="630"/>
+    <line x1="900" y1="0" x2="900" y2="630"/><line x1="1000" y1="0" x2="1000" y2="630"/>
+    <line x1="1100" y1="0" x2="1100" y2="630"/>
+    <line x1="0" y1="100" x2="1200" y2="100"/><line x1="0" y1="200" x2="1200" y2="200"/>
+    <line x1="0" y1="300" x2="1200" y2="300"/><line x1="0" y1="400" x2="1200" y2="400"/>
+    <line x1="0" y1="500" x2="1200" y2="500"/>
+  </g>
+
+  <!-- KANDIGA -->
+  <rect x="80" y="120" width="50" height="3" rx="1.5" fill="#22d3ee" opacity="0.8"/>
+  <text x="80" y="105" fill="#22d3ee" font-family="monospace" font-size="16" font-weight="bold" letter-spacing="6" opacity="0.9">KANDIGA</text>
+
+  <!-- 161B big -->
+  <text x="80" y="250" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="110" font-weight="900" letter-spacing="-3">161B</text>
+
+  <!-- 3 models. One Mac. -->
+  <text x="80" y="320" fill="#22d3ee" font-family="system-ui, -apple-system, sans-serif" font-size="44" font-weight="700">3 models. One Mac. 5.5GB.</text>
+
+  <!-- They said it couldn't be done -->
+  <text x="80" y="380" fill="#6e7681" font-family="system-ui, sans-serif" font-size="22">Full agentic pipeline. They said it couldn't be done.</text>
+
+  <!-- Bottom bar -->
+  <rect x="0" y="490" width="1200" height="140" fill="#080b10" opacity="0.8"/>
+  <line x1="0" y1="490" x2="1200" y2="490" stroke="#22d3ee" stroke-width="1" opacity="0.12"/>
+
+  <text x="100" y="548" fill="#22d3ee" font-family="monospace" font-size="32" font-weight="bold">95%</text>
+  <text x="100" y="578" fill="#6e7681" font-family="system-ui, sans-serif" font-size="14">accuracy</text>
+
+  <text x="300" y="548" fill="#e8eaed" font-family="monospace" font-size="32" font-weight="bold">44</text>
+  <text x="300" y="578" fill="#6e7681" font-family="system-ui, sans-serif" font-size="14">turns</text>
+
+  <text x="460" y="548" fill="#e8eaed" font-family="monospace" font-size="32" font-weight="bold">3s</text>
+  <text x="460" y="578" fill="#6e7681" font-family="system-ui, sans-serif" font-size="14">per turn</text>
+
+  <text x="620" y="548" fill="#e8eaed" font-family="monospace" font-size="32" font-weight="bold">3-bit</text>
+  <text x="620" y="578" fill="#6e7681" font-family="system-ui, sans-serif" font-size="14">custom NEON kernel</text>
+
+  <text x="880" y="548" fill="#e8eaed" font-family="monospace" font-size="32" font-weight="bold">Open Source</text>
+  <text x="880" y="578" fill="#6e7681" font-family="system-ui, sans-serif" font-size="14">Apache 2.0</text>
+</svg>
