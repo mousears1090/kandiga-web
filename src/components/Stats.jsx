@@ -30,7 +30,7 @@ function AnimatedNumber({ value, suffix = '', duration = 1500 }) {
 
 const stats = [
   { value: 95, suffix: '%', label: 'Accuracy', sub: '44-turn multi-turn conversation' },
-  { value: 8.1, suffix: '+ t/s', label: '35B MoE speed', sub: '3-bit on M4 (external SSD)*' },
+  { value: 12, suffix: '+ t/s', label: '35B MoE speed', sub: '3-bit quantization on M4' },
   { value: 2.7, suffix: ' GB', label: '122B GPU RAM', sub: 'Down from 70GB standard' },
   { value: 3.1, suffix: 's', label: 'Avg per turn', sub: 'Persistent KV cache' },
 ]
@@ -39,7 +39,7 @@ const rows = [
   { label: 'Model', col1: 'Qwen3 4B', col2: 'Qwen3.5-35B MoE', col3: 'Qwen3.5-122B MoE', col4: 'Gemma 4 26B MoE' },
   { label: 'Parameters', col1: '4B (dense)', col2: '35B (3B active)', col3: '122B (10B active)', col4: '26B (4B active)' },
   { label: 'Quantization', col1: '3-bit', col2: '3-bit', col3: '3-bit', col4: '4-bit' },
-  { label: 'Speed', col1: '31 tok/s', col2: '8.1 tok/s', col3: '2.2 tok/s', col4: '7.1 tok/s' },
+  { label: 'Speed*', col1: '31 tok/s', col2: '~12 tok/s', col3: '~4 tok/s', col4: '~10 tok/s' },
   { label: 'Standard RAM', col1: '2.4 GB', col2: '20 GB', col3: '70 GB', col4: '16 GB' },
   { label: 'Kandiga RAM', col1: '1.8 GB', col2: '1.0 GB', col3: '2.7 GB', col4: '1.35 GB', highlight: true },
 ]
@@ -59,7 +59,7 @@ const models = [
     name: 'Qwen3.5-35B MoE',
     sub: '3B active · 256 experts',
     specs: [
-      { label: 'Speed', value: '8.1 tok/s' },
+      { label: 'Speed', value: '~12 tok/s' },
       { label: 'RAM', value: '1.0 GB', good: true },
       { label: 'Quant', value: '3-bit' },
       { label: 'Role', value: 'Brain' },
@@ -70,7 +70,7 @@ const models = [
     sub: '10B active · 256 experts',
     featured: true,
     specs: [
-      { label: 'Speed', value: '2.2 tok/s' },
+      { label: 'Speed', value: '~4 tok/s' },
       { label: 'RAM', value: '2.7 GB', good: true },
       { label: 'Quant', value: '3-bit' },
       { label: 'Role', value: 'Reasoner' },
@@ -80,7 +80,7 @@ const models = [
     name: 'Gemma 4 26B MoE',
     sub: '4B active · 128 experts · Day-one support',
     specs: [
-      { label: 'Speed', value: '7.1 tok/s' },
+      { label: 'Speed', value: '~10 tok/s' },
       { label: 'RAM', value: '1.35 GB', good: true },
       { label: 'Quant', value: '4-bit' },
       { label: 'Role', value: 'General' },
@@ -163,7 +163,7 @@ export default function Stats() {
       </div>
 
       <p className="text-[11px] text-[var(--text-muted)] mt-4 opacity-60">
-        * MoE speeds measured on M4 Mac Mini with external SSD (~3.5 GB/s). Internal NVMe (~7+ GB/s) will be faster. Dense model (4B) speed is unaffected by storage.
+        * MoE speeds estimated for M4 Mac Mini internal NVMe. Actual speed depends on SSD bandwidth — expert weights are loaded from disk per token.
       </p>
     </section>
   )

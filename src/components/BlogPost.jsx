@@ -28,9 +28,9 @@ function CodeBlock({ children, lang = '' }) {
 function ComparisonTable() {
   const rows = [
     { model: 'Qwen3 4B 3-bit', kandiga: '1.8 GB', normal: '2.4 GB', speed: '31 tok/s' },
-    { model: 'Qwen3.5-35B MoE', kandiga: '1.0 GB', normal: '20 GB', speed: '8.1 tok/s' },
-    { model: 'Qwen3.5-122B MoE', kandiga: '2.7 GB', normal: '70 GB', speed: '2.2 tok/s', featured: true },
-    { model: 'Gemma 4 26B MoE', kandiga: '1.35 GB', normal: '16 GB', speed: '7.1 tok/s' },
+    { model: 'Qwen3.5-35B MoE', kandiga: '1.0 GB', normal: '20 GB', speed: '~12 tok/s' },
+    { model: 'Qwen3.5-122B MoE', kandiga: '2.7 GB', normal: '70 GB', speed: '~4 tok/s', featured: true },
+    { model: 'Gemma 4 26B MoE', kandiga: '1.35 GB', normal: '16 GB', speed: '~10 tok/s' },
   ]
 
   return (
@@ -196,8 +196,8 @@ export default function BlogPost() {
         <div className="my-6 grid sm:grid-cols-2 gap-4">
           {[
             { label: '22% less SSD I/O per token', desc: 'Less data to read = faster inference' },
-            { label: '35B: 6.7 to 8.1 tok/s', desc: '+21% speed improvement' },
-            { label: '122B: 1.3 to 2.2 tok/s', desc: '+69% speed improvement' },
+            { label: '35B: ~8 to ~12 tok/s', desc: '+50% speed improvement with 3-bit' },
+            { label: '122B: ~2 to ~4 tok/s', desc: '+100% speed improvement with 3-bit' },
             { label: '22% less RAM', desc: 'Shared layers shrink proportionally' },
           ].map((item, i) => (
             <div key={i} className="bg-[var(--surface)] border border-[var(--card-border)] rounded-lg p-4">
@@ -239,7 +239,7 @@ export default function BlogPost() {
               <span className="text-sm font-semibold text-[var(--text-bright)]">35B Brain (1.0GB GPU)</span>
             </div>
             <p className="text-sm text-[var(--text-muted)] leading-relaxed">
-              Handles response writing, code generation, and syntax checking. Reviews code from other models and fixes errors before delivery. 8.1 tok/s at 3-bit.
+              Handles response writing, code generation, and syntax checking. Reviews code from other models and fixes errors before delivery. ~12 tok/s at 3-bit.
             </p>
           </div>
 
@@ -249,7 +249,7 @@ export default function BlogPost() {
               <span className="text-sm font-semibold text-[var(--cyan)]">122B Reasoner (2.7GB GPU)</span>
             </div>
             <p className="text-sm text-[var(--text-muted)] leading-relaxed">
-              Activated for complex coding tasks that require deep reasoning. Lazy-loaded -- only materializes when the 35B model is not enough. 2.2 tok/s at 3-bit.
+              Activated for complex coding tasks that require deep reasoning. Lazy-loaded — only materializes when the 35B model is not enough. ~4 tok/s at 3-bit.
             </p>
           </div>
         </div>
@@ -274,7 +274,7 @@ export default function BlogPost() {
         </p>
 
         <p className="text-[var(--text)] leading-relaxed mb-4">
-          The result: <span className="text-[var(--cyan)] font-medium">7.1 tok/s at 1.35GB GPU RAM</span>. That is a 26B model running faster than most 7B models run on the same hardware, because we only load the 4B of active parameters.
+          The result: <span className="text-[var(--cyan)] font-medium">~10 tok/s at 1.35GB GPU RAM</span>. That is a 26B model running faster than most 7B models run on the same hardware, because we only load the 4B of active parameters.
         </p>
 
         <p className="text-[var(--text)] leading-relaxed mb-4">
