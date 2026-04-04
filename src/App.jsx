@@ -42,7 +42,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/blog" element={<BlogPost />} />
+        <Route path="/blog/161b-one-mac" element={<BlogPost />} />
       </Routes>
     </BrowserRouter>
   )

@@ -16,7 +16,7 @@ export default function Navbar() {
             ['Features', '#features'],
             ['Architecture', '#architecture'],
             ['Install', '#install'],
-            ['Blog', '/blog'],
+            ['Blog', '/blog/161b-one-mac'],
           ].map(([label, href]) => (
             <a key={label} href={href}
                className="text-[13px] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors no-underline">
@@ -44,7 +44,7 @@ export default function Navbar() {
 
       {mobileOpen && (
         <div className="md:hidden border-t border-[var(--card-border)] bg-[var(--void)]/95 backdrop-blur-xl px-6 py-3">
-          {[['Features','#features'],['Architecture','#architecture'],['Install','#install'],['Blog','/blog']].map(([l,h]) => (
+          {[['Features','#features'],['Architecture','#architecture'],['Install','#install'],['Blog','/blog/161b-one-mac']].map(([l,h]) => (
             <a key={l} href={h} onClick={() => setMobileOpen(false)}
                className="block py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text)] no-underline">{l}</a>
           ))}
