@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Hero from './components/Hero'
 import Terminal from './components/Terminal'
@@ -9,23 +9,9 @@ import PersistentCache from './components/PersistentCache'
 import Architecture from './components/Architecture'
 import GetStarted from './components/GetStarted'
 import Footer from './components/Footer'
-import CodePage from './components/CodePage'
-import TeamCodePage from './components/TeamCodePage'
 import BlogPost from './components/BlogPost'
 
-function App() {
-  const [page, setPage] = useState(window.location.hash)
-
-  useEffect(() => {
-    function onHash() { setPage(window.location.hash) }
-    window.addEventListener('hashchange', onHash)
-    return () => window.removeEventListener('hashchange', onHash)
-  }, [])
-
-  if (page === '#code') return <CodePage />
-  if (page === '#teamcode') return <TeamCodePage />
-  if (page === '#blog') return <BlogPost />
-
+function HomePage() {
   return (
     <div className="min-h-screen">
       <Navbar />
@@ -48,6 +34,17 @@ function App() {
       </main>
       <Footer />
     </div>
+  )
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/blog" element={<BlogPost />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 

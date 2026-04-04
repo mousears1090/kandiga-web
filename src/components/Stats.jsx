@@ -30,7 +30,7 @@ function AnimatedNumber({ value, suffix = '', duration = 1500 }) {
 
 const stats = [
   { value: 95, suffix: '%', label: 'Accuracy', sub: '44-turn multi-turn conversation' },
-  { value: 8.1, suffix: ' t/s', label: '35B MoE speed', sub: '3-bit quantization on M4' },
+  { value: 8.1, suffix: '+ t/s', label: '35B MoE speed', sub: '3-bit on M4 (external SSD)*' },
   { value: 2.7, suffix: ' GB', label: '122B GPU RAM', sub: 'Down from 70GB standard' },
   { value: 3.1, suffix: 's', label: 'Avg per turn', sub: 'Persistent KV cache' },
 ]
@@ -161,6 +161,10 @@ export default function Stats() {
           </tbody>
         </table>
       </div>
+
+      <p className="text-[11px] text-[var(--text-muted)] mt-4 opacity-60">
+        * MoE speeds measured on M4 Mac Mini with external SSD (~3.5 GB/s). Internal NVMe (~7+ GB/s) will be faster. Dense model (4B) speed is unaffected by storage.
+      </p>
     </section>
   )
 }
