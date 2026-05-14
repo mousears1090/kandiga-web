@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Hero from './components/Hero'
@@ -10,6 +11,8 @@ import Architecture from './components/Architecture'
 import GetStarted from './components/GetStarted'
 import Footer from './components/Footer'
 import BlogPost from './components/BlogPost'
+import CodePage from './components/CodePage'
+import TeamCodePage from './components/TeamCodePage'
 
 function HomePage() {
   return (
@@ -38,10 +41,23 @@ function HomePage() {
 }
 
 function App() {
+  const [hash, setHash] = useState(window.location.hash)
+
+  useEffect(() => {
+    function onHashChange() { setHash(window.location.hash) }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
+
+  if (hash === '#code') return <CodePage />
+  if (hash === '#teamcode') return <TeamCodePage />
+
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/code" element={<CodePage />} />
+        <Route path="/teamcode" element={<TeamCodePage />} />
         <Route path="/blog/161b-one-mac" element={<BlogPost />} />
       </Routes>
     </BrowserRouter>
