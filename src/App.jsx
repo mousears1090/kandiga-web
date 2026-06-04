@@ -13,6 +13,7 @@ import Footer from './components/Footer'
 import BlogPost from './components/BlogPost'
 import CodePage from './components/CodePage'
 import TeamCodePage from './components/TeamCodePage'
+import ReportCodePage from './components/ReportCodePage'
 
 function HomePage() {
   return (
@@ -51,6 +52,7 @@ function App() {
 
   if (hash === '#code') return <CodePage />
   if (hash === '#teamcode') return <TeamCodePage />
+  if (hash === '#code2') return <ReportCodePage />
 
   return (
     <BrowserRouter>
@@ -58,6 +60,7 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/code" element={<CodePage />} />
         <Route path="/teamcode" element={<TeamCodePage />} />
+        <Route path="/code2" element={<ReportCodePage />} />
         <Route path="/blog/161b-one-mac" element={<BlogPost />} />
       </Routes>
     </BrowserRouter>
