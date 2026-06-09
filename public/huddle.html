@@ -2201,7 +2201,6 @@ var App={
         var h=this.huddleImpHeaders||[],self=this;
         var fields=[
             {key:'memberId',label:'Member ID',target:'Huddle Member ID',hints:['member id','memberid','id','huddle member id']},
-            {key:'name',label:'Name',target:'Huddle Name',hints:['name','member name','patient name','huddle name']},
             {key:'pcp',label:'PCP',target:'Huddle PCP',hints:['pcp','provider','primary care','huddle pcp']},
             {key:'cm',label:'Case Manager',target:'Huddle Case Manager',hints:['case manager','care manager','cm','huddle case manager']},
             {key:'tier',label:'Tier',target:'Huddle Tier',hints:['tier','metal tier','huddle tier']},
@@ -2211,22 +2210,44 @@ var App={
             {key:'notes',label:'Huddle Notes',target:'Huddle Notes',hints:['huddle notes','notes','note']}
         ];
         var opts=function(sel){var html='<option value="-1">-- Skip --</option>';h.forEach(function(c,i){html+='<option value="'+i+'"'+(i===sel?' selected':'')+'>'+self.esc(c)+'</option>'});return html};
-        document.getElementById('huddleImpMappings').innerHTML=fields.map(function(f){
+        var bestFull=this.bestHuddleCol(['huddle name','member name','patient name','full name','name']);
+        var bestLast=-1,bestFirst=-1;
+        h.forEach(function(c,i){
+            var n=normHeader(c);
+            if(bestLast===-1&&['last name','lastname','last'].indexOf(n)>-1)bestLast=i;
+            if(bestFirst===-1&&['first name','firstname','first'].indexOf(n)>-1)bestFirst=i;
+        });
+        var nameFormat=bestLast>-1&&bestFirst>-1?'split':'full';
+        var html='<div class="fi"><label>Name Format</label><select id="huddleImp_nameFormat" onchange="App.toggleHuddleNameFormat()">'
+            +'<option value="full"'+(nameFormat==='full'?' selected':'')+'>Full Name (one column)</option>'
+            +'<option value="split"'+(nameFormat==='split'?' selected':'')+'>Last, First (two columns)</option>'
+            +'</select></div>';
+        html+='<div class="fi huddle-imp-name-full"'+(nameFormat==='split'?' style="display:none"':'')+'><label>Huddle Name</label><select id="huddleImp_name">'+opts(bestFull)+'</select></div>';
+        html+='<div class="fi huddle-imp-name-split"'+(nameFormat==='full'?' style="display:none"':'')+'><label>Last Name</label><select id="huddleImp_lastName">'+opts(bestLast)+'</select></div>';
+        html+='<div class="fi huddle-imp-name-split"'+(nameFormat==='full'?' style="display:none"':'')+'><label>First Name</label><select id="huddleImp_firstName">'+opts(bestFirst)+'</select></div>';
+        html+=fields.map(function(f){
             var best=self.bestHuddleCol(f.hints);
             return '<div class="fi"><label>'+f.label+'</label><select id="huddleImp_'+f.key+'" data-target="'+self.esc(f.target)+'">'+opts(best)+'</select></div>';
         }).join('');
-        var used={};fields.forEach(function(f){var b=self.bestHuddleCol(f.hints);if(b>=0)used[b]=true});
+        document.getElementById('huddleImpMappings').innerHTML=html;
+        var used={};[bestFull,bestLast,bestFirst].forEach(function(b){if(b>=0)used[b]=true});
+        fields.forEach(function(f){var b=self.bestHuddleCol(f.hints);if(b>=0)used[b]=true});
         document.getElementById('huddleImpExtras').innerHTML=h.map(function(c,i){
             var suggested=isHuddleCol(c)?c:('Huddle '+c);
             return '<label class="huddle-extra-row"><input type="checkbox" id="huddleExtraOn_'+i+'" '+(used[i]?'':'checked')+'><span class="huddle-extra-source">'+self.esc(c)+'</span><input type="text" id="huddleExtraName_'+i+'" value="'+self.esc(suggested)+'"></label>';
         }).join('');
         document.getElementById('huddleImpPreview').textContent=(this.huddleImpRows||[]).length+' rows ready to import';
     },
+    toggleHuddleNameFormat:function(){
+        var fmt=document.getElementById('huddleImp_nameFormat').value;
+        document.querySelectorAll('.huddle-imp-name-full').forEach(function(el){el.style.display=fmt==='full'?'':'none'});
+        document.querySelectorAll('.huddle-imp-name-split').forEach(function(el){el.style.display=fmt==='split'?'':'none'});
+    },
     runHuddleImport:function(){
         if(!this.huddleImpRows.length){this.toast('No huddle CSV loaded','danger');return}
         var self=this;
         var fieldDefs=[
-            ['memberId','Huddle Member ID'],['name','Huddle Name'],['pcp','Huddle PCP'],['cm','Huddle Case Manager'],['tier','Huddle Tier'],
+            ['memberId','Huddle Member ID'],['pcp','Huddle PCP'],['cm','Huddle Case Manager'],['tier','Huddle Tier'],
             ['status','Huddle Status'],['times','Times Discussed'],['last','Last Discussed'],['notes','Huddle Notes']
         ];
         var map={};
@@ -2240,6 +2261,17 @@ var App={
             var m=self.members.find(function(x){return App.hMemberId(x)===mid})||self.members.find(function(x){return x.memberId===mid});
             if(!m){m={id:String(self.nextMid++),memberId:'',name:'',tier:'',nextCall:'',callType:'',cm:'',active:true,extra:{}};self.members.push(m);added++}else updated++;
             Object.keys(map).forEach(function(target){self.setHval(m,target,(r[map[target]]||'').trim())});
+            var nameFmt=document.getElementById('huddleImp_nameFormat').value;
+            var name='';
+            if(nameFmt==='split'){
+                var li=parseInt(document.getElementById('huddleImp_lastName').value,10),fi=parseInt(document.getElementById('huddleImp_firstName').value,10);
+                var last=li>=0?(r[li]||'').trim():'',first=fi>=0?(r[fi]||'').trim():'';
+                name=last&&first?(last+', '+first):(last||first);
+            }else{
+                var ni=parseInt(document.getElementById('huddleImp_name').value,10);
+                name=ni>=0?(r[ni]||'').trim():'';
+            }
+            if(name)self.setHval(m,'Huddle Name',name);
             extraMaps.forEach(function(ex){self.setHval(m,ex.name,(r[ex.idx]||'').trim())});
             if(!self.hval(m,'Huddle Status'))self.setHval(m,'Huddle Status','unused');
         });
