@@ -11,9 +11,8 @@ import Architecture from './components/Architecture'
 import GetStarted from './components/GetStarted'
 import Footer from './components/Footer'
 import BlogPost from './components/BlogPost'
-import CodePage from './components/CodePage'
 import TeamCodePage from './components/TeamCodePage'
-import ReportCodePage from './components/ReportCodePage'
+import HuddleLivePage from './components/HuddleLivePage'
 
 function HomePage() {
   return (
@@ -50,17 +49,18 @@ function App() {
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
-  if (hash === '#code') return <CodePage />
+  if (hash === '#code') return <HuddleLivePage />
   if (hash === '#teamcode') return <TeamCodePage />
-  if (hash === '#code2') return <ReportCodePage />
+  if (hash === '#code2') return <HuddleLivePage />
 
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/code" element={<CodePage />} />
+        <Route path="/code" element={<HuddleLivePage />} />
         <Route path="/teamcode" element={<TeamCodePage />} />
-        <Route path="/code2" element={<ReportCodePage />} />
+        <Route path="/code2" element={<HuddleLivePage />} />
+        <Route path="/huddle" element={<HuddleLivePage />} />
         <Route path="/blog/161b-one-mac" element={<BlogPost />} />
       </Routes>
     </BrowserRouter>
