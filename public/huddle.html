@@ -482,6 +482,7 @@
             <div class="fb-group"><label>Tier</label><select id="filterTier" onchange="App.applyFilters()"><option value="">All</option></select></div>
             <div class="fb-group"><label id="filterDateFromLabel">From</label><input type="date" id="filterDateFrom" onchange="App.applyFilters()"></div>
             <div class="fb-group"><label id="filterDateToLabel">To</label><input type="date" id="filterDateTo" onchange="App.applyFilters()"></div>
+            <button class="btn btn-sm" id="reviewFilterBtn" onclick="App.toggleReviewFilter()">Review</button>
             <button class="btn btn-sm" onclick="App.clearFilters()">Clear</button>
         </div>
         <div class="bulk-bar" id="bulkBar" style="display:none">
@@ -820,7 +821,7 @@ var CP={};CALL_TYPES.forEach(function(t,i){CP[t]=i});
 var TIER_ORDER={Gold:0,Silver:1,Bronze:2,Copper:3,Steel:4};
 var HUDDLE_ID_COLS=['Huddle Member ID','Huddle Name','Huddle PCP','Huddle Case Manager','Huddle Tier'];
 var HUDDLE_COLS=['Huddle Status','Times Discussed','Last Discussed','Huddle Notes'];
-var MEMBER_COL_DEFAULTS=['ID','Member ID','Name','PCP','Case Manager','Tier','Call Type','Next Call','active','hintTitle','hintLabel','hint','noteMemberID','noteTimestamp','note'];
+var MEMBER_COL_DEFAULTS=['ID','Member ID','Name','PCP','Case Manager','Tier','Call Type','Next Call','Review During Daily','Daily Review Until','active','hintTitle','hintLabel','hint','noteMemberID','noteTimestamp','note'];
 function normHeader(h){return String(h||'').trim().toLowerCase().replace(/\s+/g,' ')}
 function isHuddleCol(h){var n=normHeader(h);return n==='huddle member id'||n==='huddle name'||n==='huddle pcp'||n==='huddle case manager'||n==='huddle tier'||n==='huddle status'||n==='times discussed'||n==='last discussed'||n==='huddle notes'}
 function uniqPush(arr,v){if(v!=null&&String(v).trim()&&arr.indexOf(v)===-1)arr.push(v)}
@@ -840,7 +841,7 @@ function csvF(v){v=String(v==null?'':v);return(v.indexOf(',')>-1||v.indexOf('"')
 var App={
     members:[],notes:[],nextMid:1,nextNid:1,
     mHandle:null,mFile:'',
-    query:'',sortCol:'default',sortDir:'asc',manualSort:false,
+    query:'',sortCol:'default',sortDir:'asc',manualSort:false,reviewOnly:false,
     sortMode:'default',sortRules:null,
     editId:null,delId:null,notesForId:null,
 
@@ -892,7 +893,7 @@ var App={
         var csv=header.map(csvF).join(',')+'\n';
         var self=this,totalCols=header.length;
         // Write member rows
-        this.members.filter(function(m){return App.isRegularMember(m)}).forEach(function(m){
+        this.members.forEach(function(m){
             var vals=layout.member.map(function(h){return self.getMemberVal(m,h)})
                 .concat(['','','','',''])
                 .concat(layout.huddle.map(function(h){return (m.extra&&m.extra[h])||''}));
@@ -956,6 +957,8 @@ var App={
         if(n==='call type'||n==='calltype')return m.callType||'';
         if(n==='cm'||n==='case manager'||n==='care manager')return m.cm||'';
         if(n==='active'||n==='status')return m.active===false?'false':'true';
+        if(n==='review during daily')return x['Review During Daily']||'';
+        if(n==='daily review until')return x['Daily Review Until']||'';
         if(n==='hinttitle')return m.hintTitle||'';
         if(n==='hintlabel')return m.hintLabel||'';
         if(n==='hint')return m.hintValue||'';
@@ -1412,9 +1415,34 @@ var App={
         document.getElementById('filterTier').value='';
         document.getElementById('filterDateFrom').value='';
         document.getElementById('filterDateTo').value='';
+        this.reviewOnly=false;
         this.applyFilters();
     },
     isRegularMember:function(m){if(this.isInHuddle(m)&&!(m.callType||'').trim()&&!(m.nextCall||'').trim())return false;return !!((m.memberId||'').trim()||(m.name||'').trim()||(m.callType||'').trim()||(m.nextCall||'').trim())},
+    isDailyReviewActive:function(m){
+        var x=m.extra||{},flag=String(x['Review During Daily']||'').toLowerCase();
+        if(flag!=='true'&&flag!=='yes'&&flag!=='1')return false;
+        var until=x['Daily Review Until']||'';
+        if(!until)return true;
+        var t=new Date(until).getTime();
+        return isNaN(t)||t>Date.now();
+    },
+    setDailyReview:function(m,on){
+        if(!m)return;
+        if(on){
+            var until=new Date(Date.now()+48*60*60*1000).toISOString();
+            this.setExtraVal(m,'Review During Daily','true');
+            this.setExtraVal(m,'Daily Review Until',until);
+        }else{
+            this.setExtraVal(m,'Review During Daily','');
+            this.setExtraVal(m,'Daily Review Until','');
+        }
+    },
+    toggleReviewFilter:function(){this.reviewOnly=!this.reviewOnly;this.applyFilters()},
+    completeDailyReview:function(id){
+        var m=this.members.find(function(x){return x.id===id});if(!m)return;
+        this.setDailyReview(m,false);this.writeMemberCSV();this.render();this.toast('Review completed','success');
+    },
     getFilteredBase:function(){
         var list=this.members.filter(function(m){return m.active!==false&&App.isRegularMember(m)});
         var cm=document.getElementById('filterCM')?document.getElementById('filterCM').value:'';
@@ -1427,6 +1455,7 @@ var App={
         if(cm)list=list.filter(function(m){return m.cm===cm});
         if(hasCTFilter)list=list.filter(function(m){return ctSet[m.callType]});
         if(tier)list=list.filter(function(m){return m.tier===tier});
+        if(this.reviewOnly)list=list.filter(function(m){return App.isDailyReviewActive(m)});
         var dateKey=App.xlMode?'dcDate':'nextCall';
         if(df)list=list.filter(function(m){return (m[dateKey]||'')>=df});
         if(dt)list=list.filter(function(m){return (m[dateKey]||'')<=dt});
@@ -1476,7 +1505,9 @@ var App={
         var list=this.filtered(),self=this;
         var tbody=document.getElementById('tbody'),empty=document.getElementById('emptyState'),table=document.getElementById('dataTable'),stats=document.getElementById('stats');
         var filtered=list.length;var total=this.members.filter(function(m){return App.isRegularMember(m)}).length;
-        stats.innerHTML='<b>'+filtered+'</b>'+(filtered!==total?' of <b>'+total+'</b>':'')+' member'+(total!==1?'s':'');
+        var reviewTotal=this.members.filter(function(m){return App.isRegularMember(m)&&App.isDailyReviewActive(m)}).length;
+        var rb=document.getElementById('reviewFilterBtn');if(rb){rb.textContent='Review'+(reviewTotal?' ('+reviewTotal+')':'');rb.classList.toggle('btn-p',this.reviewOnly)}
+        stats.innerHTML=(this.reviewOnly?'Review: ':'')+'<b>'+filtered+'</b>'+(filtered!==total?' of <b>'+total+'</b>':'')+' member'+(total!==1?'s':'');
         document.querySelectorAll('th[data-col]').forEach(function(th){
             var c=th.dataset.col;th.classList.toggle('sorted',c===self.sortCol);
             var s=th.querySelector('.si');if(s)s.textContent=c===self.sortCol?(self.sortDir==='asc'?'\u25B2':'\u25BC'):'\u25B2';
@@ -1542,6 +1573,7 @@ var App={
                         +(m.active===false
                             ?'<button class="btn btn-sm btn-p" onclick="event.stopPropagation();App.activateMember(\''+m.id+'\')">Activate</button> '
                             :'<button class="btn btn-sm" style="color:var(--t3)" onclick="event.stopPropagation();App.deactivateMember(\''+m.id+'\')">Deactivate</button> ')
+                        +(self.reviewOnly?'<button class="btn btn-sm btn-p" onclick="event.stopPropagation();App.completeDailyReview(\''+m.id+'\')">Complete</button> ':'')
                         +'<button class="btn btn-sm btn-d" onclick="event.stopPropagation();App.showDeleteModal(\''+m.id+'\')">Del</button>'
                         +'</td></tr>';
                 }).join('');
@@ -1610,7 +1642,9 @@ var App={
         }else{
             dateFields='<div class="nf-group"><label>Next Call</label><input type="date" id="nfNextCall" value="'+this.esc(m.nextCall)+'" onchange="App.updateFromNotes()"></div>';
         }
-        document.getElementById('noteFields').innerHTML=dateFields+'<div class="nf-group"><label>Call Type</label><select id="nfCallType" onchange="App.updateFromNotes()"><option value="">Select...</option>'+opts+'</select></div>';
+        var reviewChecked=this.isDailyReviewActive(m)?' checked':'';
+        document.getElementById('noteFields').innerHTML=dateFields+'<div class="nf-group"><label>Call Type</label><select id="nfCallType" onchange="App.updateFromNotes()"><option value="">Select...</option>'+opts+'</select></div>'
+            +'<div class="nf-group"><label>Review</label><label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--t2);text-transform:none;letter-spacing:0;font-weight:600"><input type="checkbox" id="nfDailyReview" onchange="App.updateDailyReviewFromNotes(this.checked)"'+reviewChecked+' style="width:15px;height:15px;accent-color:var(--acc)"> Review during Daily</label></div>';
         document.getElementById('noteInput').value='';
         document.getElementById('noteActionBtn').textContent='Add Note';
         this.renderNotesList();
@@ -1635,6 +1669,11 @@ var App={
             data.nextCall=document.getElementById('nfNextCall').value;
         }
         this.updateMember(m.id,data);
+    },
+    updateDailyReviewFromNotes:function(checked){
+        if(!this.notesForId)return;
+        var m=this.members.find(function(x){return x.memberId===App.notesForId});if(!m)return;
+        this.setDailyReview(m,checked);this.writeMemberCSV();this.render();this.toast(checked?'Added to Daily review':'Removed from Daily review','success');
     },
     hideNotesModal:function(){
         // Auto-save any text in the field before closing
