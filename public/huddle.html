@@ -403,6 +403,10 @@
         .hud-input:focus,.hud-ta:focus,.hud-select:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-bg)}
         .hud-read{color:var(--t2);white-space:normal;min-width:80px}
         .hud-note-read{max-width:360px;white-space:pre-wrap;color:var(--t2)}
+        .huddle-extra-map{display:grid;gap:8px}
+        .huddle-extra-row{display:grid;grid-template-columns:18px minmax(120px,1fr) minmax(140px,1fr);gap:8px;align-items:center;padding:8px;border:1px solid var(--bd);border-radius:var(--r);background:var(--bg-2)}
+        .huddle-extra-row input[type=text]{width:100%;padding:6px 8px;font-family:var(--font);font-size:12px;background:var(--bg-1);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1)}
+        .huddle-extra-source{font-size:12px;color:var(--t2);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     </style>
 </head>
 <body>
@@ -537,7 +541,7 @@
             <button class="btn btn-sm" onclick="App.clearHuddleSelection()">Clear</button>
         </div>
         <div class="table-wrap"><div class="table-scroll">
-            <table class="data-table" id="huddleTable"><thead><tr>
+            <table class="data-table" id="huddleTable"><thead><tr id="huddleHeadRow">
                 <th class="cell-check"><input type="checkbox" onchange="App.toggleHuddleSelectAll(this.checked)"></th>
                 <th>Member ID</th><th>Name</th><th>PCP</th><th>Case Manager</th><th>Times</th><th>Last Discussed</th><th>Status</th><th>Huddle Notes</th><th></th>
             </tr></thead><tbody id="huddleBody"></tbody></table>
@@ -750,11 +754,25 @@
             <div id="hintImpMappings" class="fg" style="margin-bottom:16px"></div>
             <div id="hintImpPreview" style="margin-top:14px;font-size:12px;color:var(--t3)"></div>
         </div>
+        <!-- HUDDLE IMPORT -->
+        <div class="mb import-panel" id="impPanelHuddle" style="display:none;flex:1;overflow-y:auto">
+            <p style="color:var(--t2);font-size:13px;margin-bottom:14px">Map your CSV columns into huddle-side fields. Extra columns can be added to the huddle section of the same CSV.</p>
+            <div id="huddleImpMappings" class="fg" style="margin-bottom:16px"></div>
+            <div style="border:1px solid var(--bd);border-radius:var(--r);padding:14px;margin-bottom:16px;background:var(--bg-1)">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                    <label style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.04em">Extra Huddle Columns</label>
+                    <span style="font-size:11px;color:var(--t3)">Uncheck to skip</span>
+                </div>
+                <div id="huddleImpExtras" class="huddle-extra-map"></div>
+            </div>
+            <div id="huddleImpPreview" style="margin-top:14px;font-size:12px;color:var(--t3)"></div>
+        </div>
         <div class="mf">
             <button class="btn" onclick="App.hideImportModal()">Cancel</button>
             <button class="btn btn-p" id="impBtnMembers" onclick="App.runImport()">Import Members</button>
             <button class="btn btn-p" id="impBtnNotes" style="display:none" onclick="App.runNoteImport()">Import Notes</button>
             <button class="btn btn-p" id="impBtnHints" style="display:none" onclick="App.runHintImport()">Import Hints</button>
+            <button class="btn btn-p" id="impBtnHuddle" style="display:none" onclick="App.runHuddleImport()">Import Huddle</button>
         </div>
     </div>
 </div>
@@ -927,7 +945,7 @@ var App={
     },
 
     /* ===== PARSE ===== */
-    extraCols:[],csvHeaders:[],memberHeaders:[],huddleHeaders:HUDDLE_COLS.slice(),
+    extraCols:[],csvHeaders:[],memberHeaders:[],huddleHeaders:HUDDLE_ID_COLS.concat(HUDDLE_COLS),
     getMemberVal:function(m,h){
         var n=normHeader(h),x=m.extra||{};
         if(n==='id')return m.id||'';
@@ -945,10 +963,11 @@ var App={
     },
     setExtraVal:function(m,h,v){if(!m.extra)m.extra={};m.extra[h]=v==null?'':String(v)},
     buildCSVLayout:function(){
-        var mh=[],hh=[],self=this;
-        (this.csvHeaders||[]).forEach(function(h){if(!h)return;if(isHuddleCol(h))uniqPush(hh,h);else uniqPush(mh,h)});
+        var mh=[],hh=[],self=this,hset={};
+        (this.huddleHeaders||[]).forEach(function(h){if(h)hset[h]=true});
+        (this.csvHeaders||[]).forEach(function(h){if(!h)return;if(isHuddleCol(h)||hset[h])uniqPush(hh,h);else uniqPush(mh,h)});
         MEMBER_COL_DEFAULTS.forEach(function(h){uniqPush(mh,h)});
-        this.members.forEach(function(m){Object.keys(m.extra||{}).forEach(function(h){if(isHuddleCol(h))uniqPush(hh,h);else uniqPush(mh,h)})});
+        this.members.forEach(function(m){Object.keys(m.extra||{}).forEach(function(h){if(isHuddleCol(h)||hset[h])uniqPush(hh,h);else uniqPush(mh,h)})});
         HUDDLE_ID_COLS.concat(HUDDLE_COLS).forEach(function(h){uniqPush(hh,h)});
         if(!mh.length)mh=MEMBER_COL_DEFAULTS.slice();
         return{member:mh,huddle:hh};
@@ -962,7 +981,9 @@ var App={
         var data=hasH?rows.slice(1):rows;
         this.csvHeaders=headers.slice();
         this.memberHeaders=[];this.huddleHeaders=[];
-        headers.forEach(function(h){if(!h)return;if(isHuddleCol(h))uniqPush(App.huddleHeaders,h);else uniqPush(App.memberHeaders,h)});
+        var gapStart=-1,blankRun=0;
+        headers.forEach(function(h,i){if(h){blankRun=0}else{blankRun++;if(blankRun>=5&&gapStart<0)gapStart=i-4}});
+        headers.forEach(function(h,i){if(!h)return;if(isHuddleCol(h)||(gapStart>=0&&i>gapStart+4))uniqPush(App.huddleHeaders,h);else uniqPush(App.memberHeaders,h)});
         HUDDLE_ID_COLS.concat(HUDDLE_COLS).forEach(function(h){uniqPush(App.huddleHeaders,h)});
         // Detect extra columns by header name
         this.extraCols=[];
@@ -1671,9 +1692,11 @@ var App={
         document.getElementById('impPanelMembers').style.display='';
         document.getElementById('impPanelNotes').style.display='none';
         document.getElementById('impPanelHints').style.display='none';
+        document.getElementById('impPanelHuddle').style.display='none';
         document.getElementById('impBtnMembers').style.display='';
         document.getElementById('impBtnNotes').style.display='none';
         document.getElementById('impBtnHints').style.display='none';
+        document.getElementById('impBtnHuddle').style.display='none';
         var cols=this.importCols;
         var fields=[{key:'memberId',label:'Member ID',hints:['member id','memberid','id','hicn','member_id','subscriber']},{key:'tier',label:'Metal Tier',hints:['metal tier','tier','metal','plan tier','plan']},{key:'cm',label:'CM',hints:['cm','care manager','case manager']}];
         var html='';
@@ -2021,6 +2044,7 @@ var App={
     hCM:function(m){return this.hval(m,'Huddle Case Manager')||m.cm||''},
     hTier:function(m){return this.hval(m,'Huddle Tier')||m.tier||''},
     pcpOf:function(m){return this.hval(m,'Huddle PCP')||m.pcp||(m.extra&&(m.extra.PCP||m.extra.Provider||m.extra['Primary Care Provider']))||''},
+    customHuddleCols:function(){var fixed={};HUDDLE_ID_COLS.concat(HUDDLE_COLS).forEach(function(h){fixed[h]=true});return (this.huddleHeaders||[]).filter(function(h){return h&&!fixed[h]})},
     isInHuddle:function(m){return !!(this.hval(m,'Huddle Status')||parseInt(this.hval(m,'Times Discussed')||'0',10)>0)},
     huddleStatus:function(m){return this.hval(m,'Huddle Status')||'unused'},
     huddleRows:function(){
@@ -2055,7 +2079,10 @@ var App={
             ['In huddle',all.length],['Pending',pending],['Unused',unused],['Used',used],['CMs',Object.keys(cms).length],['Providers',Object.keys(pcps).length]
         ].map(function(x){return '<div class="h-stat"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>'}).join('');
         var editBtn=document.getElementById('huddleEditModeBtn');if(editBtn)editBtn.textContent=this.huddleEditMode?'View Mode':'Edit Mode';
-        var body=document.getElementById('huddleBody'),empty=document.getElementById('huddleEmpty'),table=document.getElementById('huddleTable'),self=this;
+        var body=document.getElementById('huddleBody'),empty=document.getElementById('huddleEmpty'),table=document.getElementById('huddleTable'),head=document.getElementById('huddleHeadRow'),self=this,customCols=this.customHuddleCols();
+        if(head)head.innerHTML='<th class="cell-check"><input type="checkbox" onchange="App.toggleHuddleSelectAll(this.checked)"></th>'
+            +'<th>Member ID</th><th>Name</th><th>PCP</th><th>Case Manager</th><th>Times</th><th>Last Discussed</th><th>Status</th><th>Huddle Notes</th>'
+            +customCols.map(function(h){return '<th>'+self.esc(h)+'</th>'}).join('')+'<th></th>';
         if(!rows.length){table.style.display='none';empty.style.display='block';this.updateHuddleBulkBar();return}
         table.style.display='';empty.style.display='none';
         body.innerHTML=rows.map(function(m){
@@ -2073,6 +2100,7 @@ var App={
                 +'<td><div class="hud-read">'+self.esc(self.hval(m,'Last Discussed'))+'</div></td>'
                 +'<td>'+statusControl+'</td>'
                 +'<td><div class="hud-note-read">'+self.esc(self.hval(m,'Huddle Notes'))+'</div></td>'
+                +customCols.map(function(h){return '<td><div class="hud-read">'+self.esc(self.hval(m,h))+'</div></td>'}).join('')
                 +'<td class="cell-actions"><button class="btn btn-sm" onclick="App.showHuddleEdit(\''+m.id+'\')">Edit</button> <button class="btn btn-sm" onclick="App.markHuddle(\''+m.id+'\',\''+(st==='pending'?'unused':'pending')+'\')">'+(st==='pending'?'Unpend':'Pending')+'</button> <button class="btn btn-sm btn-d" onclick="App.removeFromHuddle(\''+m.id+'\')">&times;</button></td>'
                 +'</tr>';
         }).join('');
@@ -2117,6 +2145,68 @@ var App={
         });
         this.writeMemberCSV();this.render();this.renderHuddle();this.toast(added+' added, '+updated+' updated'+(skipped?', '+skipped+' skipped':''),'success');
     },
+    huddleImpHeaders:[],huddleImpRows:[],
+    showHuddleImportModal:function(){
+        document.getElementById('importTitle').textContent='Import High-Risk Huddle';
+        ['impPanelMembers','impPanelNotes','impPanelHints','impPanelHuddle'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=id==='impPanelHuddle'?'':'none'});
+        ['impBtnMembers','impBtnNotes','impBtnHints','impBtnHuddle'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=id==='impBtnHuddle'?'':'none'});
+        this.buildHuddleImpMappings();
+        document.getElementById('importModal').classList.add('open');this.lockScroll();
+    },
+    bestHuddleCol:function(hints){
+        var h=this.huddleImpHeaders||[],best=-1;
+        h.forEach(function(c,i){var n=normHeader(c);if(best===-1&&hints.some(function(x){return n===x||n.indexOf(x)>-1}))best=i});
+        return best;
+    },
+    buildHuddleImpMappings:function(){
+        var h=this.huddleImpHeaders||[],self=this;
+        var fields=[
+            {key:'memberId',label:'Member ID',target:'Huddle Member ID',hints:['member id','memberid','id','huddle member id']},
+            {key:'name',label:'Name',target:'Huddle Name',hints:['name','member name','patient name','huddle name']},
+            {key:'pcp',label:'PCP',target:'Huddle PCP',hints:['pcp','provider','primary care','huddle pcp']},
+            {key:'cm',label:'Case Manager',target:'Huddle Case Manager',hints:['case manager','care manager','cm','huddle case manager']},
+            {key:'tier',label:'Tier',target:'Huddle Tier',hints:['tier','metal tier','huddle tier']},
+            {key:'status',label:'Huddle Status',target:'Huddle Status',hints:['huddle status','status']},
+            {key:'times',label:'Times Discussed',target:'Times Discussed',hints:['times discussed','discussed count','times']},
+            {key:'last',label:'Last Discussed',target:'Last Discussed',hints:['last discussed','last huddle','discussed date']},
+            {key:'notes',label:'Huddle Notes',target:'Huddle Notes',hints:['huddle notes','notes','note']}
+        ];
+        var opts=function(sel){var html='<option value="-1">-- Skip --</option>';h.forEach(function(c,i){html+='<option value="'+i+'"'+(i===sel?' selected':'')+'>'+self.esc(c)+'</option>'});return html};
+        document.getElementById('huddleImpMappings').innerHTML=fields.map(function(f){
+            var best=self.bestHuddleCol(f.hints);
+            return '<div class="fi"><label>'+f.label+'</label><select id="huddleImp_'+f.key+'" data-target="'+self.esc(f.target)+'">'+opts(best)+'</select></div>';
+        }).join('');
+        var used={};fields.forEach(function(f){var b=self.bestHuddleCol(f.hints);if(b>=0)used[b]=true});
+        document.getElementById('huddleImpExtras').innerHTML=h.map(function(c,i){
+            var suggested=isHuddleCol(c)?c:('Huddle '+c);
+            return '<label class="huddle-extra-row"><input type="checkbox" id="huddleExtraOn_'+i+'" '+(used[i]?'':'checked')+'><span class="huddle-extra-source">'+self.esc(c)+'</span><input type="text" id="huddleExtraName_'+i+'" value="'+self.esc(suggested)+'"></label>';
+        }).join('');
+        document.getElementById('huddleImpPreview').textContent=(this.huddleImpRows||[]).length+' rows ready to import';
+    },
+    runHuddleImport:function(){
+        if(!this.huddleImpRows.length){this.toast('No huddle CSV loaded','danger');return}
+        var self=this;
+        var fieldDefs=[
+            ['memberId','Huddle Member ID'],['name','Huddle Name'],['pcp','Huddle PCP'],['cm','Huddle Case Manager'],['tier','Huddle Tier'],
+            ['status','Huddle Status'],['times','Times Discussed'],['last','Last Discussed'],['notes','Huddle Notes']
+        ];
+        var map={};
+        fieldDefs.forEach(function(def){var el=document.getElementById('huddleImp_'+def[0]);var i=el?parseInt(el.value,10):-1;if(i>=0)map[def[1]]=i});
+        if(map['Huddle Member ID']==null){this.toast('Map Member ID before importing','danger');return}
+        var extraMaps=[];
+        (this.huddleImpHeaders||[]).forEach(function(h,i){var on=document.getElementById('huddleExtraOn_'+i),name=document.getElementById('huddleExtraName_'+i);if(on&&on.checked&&name&&name.value.trim()){extraMaps.push({idx:i,name:name.value.trim()})}});
+        var added=0,updated=0,skipped=0;
+        this.huddleImpRows.forEach(function(r){
+            var mid=(r[map['Huddle Member ID']]||'').trim();if(!mid){skipped++;return}
+            var m=self.members.find(function(x){return App.hMemberId(x)===mid})||self.members.find(function(x){return x.memberId===mid});
+            if(!m){m={id:String(self.nextMid++),memberId:'',name:'',tier:'',nextCall:'',callType:'',cm:'',active:true,extra:{}};self.members.push(m);added++}else updated++;
+            Object.keys(map).forEach(function(target){self.setHval(m,target,(r[map[target]]||'').trim())});
+            extraMaps.forEach(function(ex){self.setHval(m,ex.name,(r[ex.idx]||'').trim())});
+            if(!self.hval(m,'Huddle Status'))self.setHval(m,'Huddle Status','unused');
+        });
+        this.writeMemberCSV();this.render();this.renderHuddle();this.hideImportModal();
+        this.toast(added+' added, '+updated+' updated'+(skipped?', '+skipped+' skipped':''),'success');
+    },
     finalizePendingHuddle:function(){var today=new Date().toISOString().split('T')[0],n=0;this.members.forEach(function(m){if(App.huddleStatus(m)==='pending'){App.setHval(m,'Huddle Status','used');App.setHval(m,'Last Discussed',today);App.setHval(m,'Times Discussed',String(parseInt(App.hval(m,'Times Discussed')||'0',10)+1));n++}});if(n)this.writeMemberCSV();return n},
     generateHuddlePDF:function(){var pending=this.members.filter(function(m){return App.huddleStatus(m)==='pending'});var rows=pending.length?pending:this.huddleRows();this.printHuddleReport(rows);var finalized=this.finalizePendingHuddle();this.renderHuddle();if(finalized)this.toast('Finalized '+finalized+' pending patients as used','success')},
     printHuddleReport:function(rows){
@@ -2150,7 +2240,11 @@ var App={
                     self.importRows=self.importData.slice(1);
                     self.showImportModal();
                 }else if(type==='huddle'){
-                    self.importHuddleCSV(text);
+                    var rows=parseCSV(text);
+                    if(!rows.length){self.toast('CSV is empty','danger');return}
+                    self.huddleImpHeaders=rows[0].map(function(x){return x.trim()});
+                    self.huddleImpRows=rows.slice(1).filter(function(r){return r.some(function(x){return String(x||'').trim()})});
+                    self.showHuddleImportModal();
                 }else if(type==='notes'){
                     var rows=parseCSV(text);
                     self.noteImpHeaders=rows[0].map(function(x){return x.trim()});
@@ -2172,9 +2266,11 @@ var App={
         document.getElementById('impPanelMembers').style.display='none';
         document.getElementById('impPanelNotes').style.display='';
         document.getElementById('impPanelHints').style.display='none';
+        document.getElementById('impPanelHuddle').style.display='none';
         document.getElementById('impBtnMembers').style.display='none';
         document.getElementById('impBtnNotes').style.display='';
         document.getElementById('impBtnHints').style.display='none';
+        document.getElementById('impBtnHuddle').style.display='none';
         this.buildNoteImpMappings();
         document.getElementById('importModal').classList.add('open');this.lockScroll();
     },
@@ -2183,9 +2279,11 @@ var App={
         document.getElementById('impPanelMembers').style.display='none';
         document.getElementById('impPanelNotes').style.display='none';
         document.getElementById('impPanelHints').style.display='';
+        document.getElementById('impPanelHuddle').style.display='none';
         document.getElementById('impBtnMembers').style.display='none';
         document.getElementById('impBtnNotes').style.display='none';
         document.getElementById('impBtnHints').style.display='';
+        document.getElementById('impBtnHuddle').style.display='none';
         this.buildHintImpMappings();
         document.getElementById('importModal').classList.add('open');this.lockScroll();
     },
