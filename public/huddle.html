@@ -415,6 +415,8 @@
         .pdf-check{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--bd);border-radius:var(--r);background:var(--bg-2);font-size:13px;color:var(--t2);cursor:pointer}
         .pdf-check input{width:15px;height:15px;accent-color:var(--acc);flex-shrink:0}
         .pdf-check span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .pdf-field-row{display:grid;grid-template-columns:minmax(130px,1fr) minmax(120px,1fr);gap:8px;align-items:center}
+        .pdf-label-input{width:100%;padding:6px 8px;font-family:var(--font);font-size:12px;background:var(--bg-1);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);box-sizing:border-box}
         .pdf-summary{font-size:12px;color:var(--t3);margin-top:10px}
         .gen-mode-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:14px}
         .gen-mode{display:flex;align-items:flex-start;gap:8px;padding:10px;border:1px solid var(--bd);border-radius:var(--r);background:var(--bg-1);cursor:pointer}
@@ -677,6 +679,7 @@
                 <div class="fi"><label>Rows</label><select id="pdfScope" onchange="App.updateHuddlePDFPreview()"><option value="pending">Pending only</option><option value="active">Pending + unused</option><option value="selected">Selected only</option><option value="filtered">Current filtered view</option><option value="allNotUsed">All non-used huddle patients</option><option value="all">All huddle patients</option></select></div>
                 <div class="fi"><label>Group By</label><select id="pdfGroupBy" onchange="App.updateHuddlePDFPreview()"></select></div>
                 <div class="fi"><label>Sort By</label><select id="pdfSortBy" onchange="App.updateHuddlePDFPreview()"></select></div>
+                <div class="fi"><label>Layout</label><select id="pdfColumns" onchange="App.updateHuddlePDFPreview()"><option value="auto">Auto columns</option><option value="2">Two columns</option><option value="1">One column</option></select></div>
                 <div class="fi"><label>Card Detail</label><select id="pdfDensity" onchange="App.updateHuddlePDFPreview()"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div>
             </div>
             <div class="pdf-option-box">
@@ -688,7 +691,7 @@
                 <div class="pdf-check-grid" id="pdfStatusFields"></div>
             </div>
             <div class="pdf-option-box">
-                <div class="pdf-option-head"><label>Patient Fields</label><span style="font-size:11px;color:var(--t3)">Choose what appears on each card</span></div>
+                <div class="pdf-option-head"><label>Patient Fields</label><span style="font-size:11px;color:var(--t3)">Choose and rename PDF labels</span></div>
                 <div class="pdf-check-grid" id="pdfFieldList"></div>
             </div>
             <div class="pdf-summary" id="pdfPreviewText"></div>
@@ -2976,10 +2979,12 @@ var App={
             scope:'pending',
             groupBy:(document.getElementById('huddleGroupBy')||{}).value||'pcp',
             sortBy:(document.getElementById('huddleSortBy')||{}).value||'last',
+            columns:'auto',
             density:'comfortable',
             finalize:true,
             statuses:{pending:true,unused:false,used:false},
-            fields:{name:true,memberId:true,pcp:true,cm:true,tier:true,status:true,times:true,last:true,notes:true}
+            fields:{name:true,memberId:true,pcp:true,cm:true,tier:true,status:true,times:true,last:true,notes:true},
+            labels:{}
         };
     },
     getHuddlePDFSettings:function(){
@@ -2989,12 +2994,14 @@ var App={
         saved.statuses=Object.assign({},def.statuses,saved.statuses||{});
         saved.statuses.used=false;
         saved.fields=Object.assign({},def.fields,saved.fields||{});
+        saved.labels=Object.assign({},def.labels,saved.labels||{});
         return Object.assign(def,saved);
     },
     saveHuddlePDFSettings:function(){
-        var s={version:2,title:document.getElementById('pdfTitle').value.trim()||'High-Risk Huddle',subtitle:document.getElementById('pdfSubtitle').value.trim(),fileName:document.getElementById('pdfFileName').value.trim()||'high-risk-huddle.pdf',scope:document.getElementById('pdfScope').value,groupBy:document.getElementById('pdfGroupBy').value,sortBy:document.getElementById('pdfSortBy').value,density:document.getElementById('pdfDensity').value,finalize:document.getElementById('pdfFinalize').checked,statuses:{},fields:{}};
+        var s={version:2,title:document.getElementById('pdfTitle').value.trim()||'High-Risk Huddle',subtitle:document.getElementById('pdfSubtitle').value.trim(),fileName:document.getElementById('pdfFileName').value.trim()||'high-risk-huddle.pdf',scope:document.getElementById('pdfScope').value,groupBy:document.getElementById('pdfGroupBy').value,sortBy:document.getElementById('pdfSortBy').value,columns:document.getElementById('pdfColumns').value,density:document.getElementById('pdfDensity').value,finalize:document.getElementById('pdfFinalize').checked,statuses:{},fields:{},labels:{}};
         document.querySelectorAll('#pdfStatusFields input').forEach(function(cb){s.statuses[cb.value]=cb.checked});
-        document.querySelectorAll('#pdfFieldList input').forEach(function(cb){s.fields[cb.value]=cb.checked});
+        document.querySelectorAll('#pdfFieldList input[type=checkbox]').forEach(function(cb){s.fields[cb.value]=cb.checked});
+        document.querySelectorAll('#pdfFieldList input[data-label-key]').forEach(function(inp){s.labels[inp.getAttribute('data-label-key')]=inp.value.trim()});
         localStorage.setItem('mm_huddle_pdf',JSON.stringify(s));
         return s;
     },
@@ -3019,6 +3026,7 @@ var App={
         document.getElementById('pdfSubtitle').value=s.subtitle||'';
         document.getElementById('pdfFileName').value=s.fileName||'high-risk-huddle.pdf';
         document.getElementById('pdfScope').value=s.scope||'pending';
+        document.getElementById('pdfColumns').value=s.columns||'auto';
         document.getElementById('pdfDensity').value=s.density||'comfortable';
         document.getElementById('pdfFinalize').checked=s.finalize!==false;
         var opts='<option value="pcp">PCP</option><option value="cm">Case Manager</option><option value="status">Status</option><option value="none">No grouping</option>';
@@ -3027,8 +3035,8 @@ var App={
         document.getElementById('pdfSortBy').value=s.sortBy||'last';
         document.getElementById('pdfStatusFields').innerHTML=['pending','unused','used'].map(function(st){return '<label class="pdf-check"><input type="checkbox" value="'+st+'" '+(s.statuses&&s.statuses[st]?'checked':'')+' onchange="App.updateHuddlePDFPreview()"><span>'+st+'</span></label>'}).join('');
         var fields=[{key:'name',label:'Name'}].concat(this.huddlePDFFieldDefs());
-        document.getElementById('pdfFieldList').innerHTML=fields.map(function(f){return '<label class="pdf-check"><input type="checkbox" value="'+self.esc(f.key)+'" '+(s.fields&&s.fields[f.key]?'checked':'')+' onchange="App.updateHuddlePDFPreview()"><span>'+self.esc(f.label)+'</span></label>'}).join('');
-        ['pdfTitle','pdfSubtitle','pdfFileName','pdfScope','pdfGroupBy','pdfSortBy','pdfDensity','pdfFinalize'].forEach(function(id){document.getElementById(id).oninput=function(){App.updateHuddlePDFPreview()};document.getElementById(id).onchange=function(){App.updateHuddlePDFPreview()}});
+        document.getElementById('pdfFieldList').innerHTML=fields.map(function(f){var label=s.labels&&s.labels[f.key]||f.label;return '<div class="pdf-field-row"><label class="pdf-check"><input type="checkbox" value="'+self.esc(f.key)+'" '+(s.fields&&s.fields[f.key]?'checked':'')+' onchange="App.updateHuddlePDFPreview()"><span>'+self.esc(f.label)+'</span></label><input class="pdf-label-input" data-label-key="'+self.esc(f.key)+'" value="'+self.esc(label)+'" oninput="App.updateHuddlePDFPreview()"></div>'}).join('');
+        ['pdfTitle','pdfSubtitle','pdfFileName','pdfScope','pdfGroupBy','pdfSortBy','pdfColumns','pdfDensity','pdfFinalize'].forEach(function(id){document.getElementById(id).oninput=function(){App.updateHuddlePDFPreview()};document.getElementById(id).onchange=function(){App.updateHuddlePDFPreview()}});
         document.getElementById('huddlePdfModal').classList.add('open');this.lockScroll();this.updateHuddlePDFPreview();
     },
     hideHuddlePDFModal:function(){document.getElementById('huddlePdfModal').classList.remove('open');this.unlockScroll()},
@@ -3088,7 +3096,7 @@ var App={
         function ensure(h){if(y+h>bottom){doc.addPage();y=mT}}
         function tint(c,a){return c.map(function(v){return Math.round(v*a+255*(1-a))})}
         function textLines(txt,w,fs){doc.setFontSize(fs);return doc.splitTextToSize(String(txt||''),w)}
-        var chosen=settings.fields||{},defs=[{key:'name',label:'Name',get:function(m){return self.hName(m)||'Unnamed'}}].concat(this.huddlePDFFieldDefs()).filter(function(f){return chosen[f.key]});
+        var chosen=settings.fields||{},labels=settings.labels||{},defs=[{key:'name',label:'Name',get:function(m){return self.hName(m)||'Unnamed'}}].concat(this.huddlePDFFieldDefs()).map(function(f){return Object.assign({},f,{label:labels[f.key]||f.label})}).filter(function(f){return chosen[f.key]});
         var compact=settings.density==='compact',fieldFs=compact?7.6:8.4,labelFs=compact?6.2:6.8,rowGap=compact?1.6:2.4,cardPad=compact?4:5;
         doc.setTextColor(17,24,39);doc.setFont('helvetica','bold');doc.setFontSize(21);doc.text(settings.title||'High-Risk Huddle',x0,y,{baseline:'top'});y+=lh(21)+1;
         if(settings.subtitle){doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(91,101,115);doc.text(settings.subtitle,x0,y,{baseline:'top'});y+=lh(10)+1}
@@ -3101,30 +3109,39 @@ var App={
             doc.setFillColor(tc[0],tc[1],tc[2]);doc.roundedRect(x0,y,contentW,8,2,2,'F');
             doc.setFillColor(c[0],c[1],c[2]);doc.rect(x0,y,2,8,'F');
             doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(17,24,39);doc.text(g+'  ('+groups[g].length+')',x0+5,y+4,{baseline:'middle'});y+=11;
+            var colCount=settings.columns==='1'?1:(settings.columns==='2'?2:2),gap=4,cardW=colCount===1?contentW:(contentW-gap)/2,cols=[];
+            for(var ci=0;ci<colCount;ci++)cols.push({x:x0+ci*(cardW+gap),y:y});
             groups[g].forEach(function(m){
                 var title=self.hName(m)||'Unnamed',sub=[self.hMemberId(m),self.hCM(m)?'CM: '+self.hCM(m):'',self.pcpOf(m)?'PCP: '+self.pcpOf(m):''].filter(Boolean).join('  |  ');
-                var fieldLines=[];defs.forEach(function(f){if(f.key==='name')return;var v=f.get(m);if(v)fieldLines.push({label:f.label,value:v,lines:textLines(v,contentW-16,fieldFs).slice(0,compact?3:6)})});
+                var fieldLines=[];defs.forEach(function(f){if(f.key==='name')return;var v=f.get(m);if(v)fieldLines.push({label:f.label,value:v,lines:textLines(v,cardW-12,fieldFs).slice(0,compact?3:6)})});
                 var fieldH=0;fieldLines.forEach(function(f){fieldH+=lh(labelFs)+Math.max(1,f.lines.length)*lh(fieldFs)+rowGap});
-                var subLines=textLines(sub,132,8).slice(0,2);
+                var subLines=textLines(sub,Math.max(36,cardW-42),8).slice(0,2);
                 var headerH=Math.max(14,5+lh(11)+subLines.length*lh(8));
-                var cardH=Math.max(26,headerH+cardPad+fieldH+cardPad);ensure(cardH+4);
-                doc.setDrawColor(201,209,217);doc.setFillColor(255,255,255);doc.roundedRect(x0,y,contentW,cardH,2,2,'FD');
-                doc.setFillColor(243,245,248);doc.roundedRect(x0,y,contentW,headerH,2,2,'F');
-                doc.setFillColor(c[0],c[1],c[2]);doc.roundedRect(x0+4,y+3,7,7,1.5,1.5,'F');
-                doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(7);doc.text((title||'?').charAt(0).toUpperCase(),x0+7.5,y+6.7,{align:'center',baseline:'middle'});
-                doc.setTextColor(17,24,39);doc.setFontSize(11);doc.text(textLines(title,118,11).slice(0,1),x0+14,y+3.2,{baseline:'top'});
-                doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(91,101,115);doc.text(subLines,x0+14,y+8,{baseline:'top'});
+                var cardH=Math.max(26,headerH+cardPad+fieldH+cardPad),col=cols.slice().sort(function(a,b){return a.y-b.y})[0];
+                if(col.y+cardH>bottom){
+                    var roomy=cols.filter(function(cn){return cn.y+cardH<=bottom}).sort(function(a,b){return a.y-b.y})[0];
+                    if(roomy)col=roomy;
+                    else{doc.addPage();cols.forEach(function(cn){cn.y=mT});col=cols[0]}
+                }
+                var cx=col.x,cy=col.y;
+                doc.setDrawColor(201,209,217);doc.setFillColor(255,255,255);doc.roundedRect(cx,cy,cardW,cardH,2,2,'FD');
+                doc.setFillColor(243,245,248);doc.roundedRect(cx,cy,cardW,headerH,2,2,'F');
+                doc.setFillColor(c[0],c[1],c[2]);doc.roundedRect(cx+4,cy+3,7,7,1.5,1.5,'F');
+                doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(7);doc.text((title||'?').charAt(0).toUpperCase(),cx+7.5,cy+6.7,{align:'center',baseline:'middle'});
+                doc.setTextColor(17,24,39);doc.setFontSize(11);doc.text(textLines(title,Math.max(36,cardW-44),11).slice(0,1),cx+14,cy+3.2,{baseline:'top'});
+                doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(91,101,115);doc.text(subLines,cx+14,cy+8,{baseline:'top'});
                 var badge=self.huddleStatus(m),bc=badge==='used'?[21,128,61]:(badge==='pending'?[124,58,237]:[180,83,9]);
-                doc.setFillColor(tint(bc,.12)[0],tint(bc,.12)[1],tint(bc,.12)[2]);doc.setDrawColor(bc[0],bc[1],bc[2]);doc.roundedRect(x0+contentW-26,y+3,20,6,3,3,'FD');
-                doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.setTextColor(bc[0],bc[1],bc[2]);doc.text(badge.toUpperCase(),x0+contentW-16,y+6,{align:'center',baseline:'middle'});
-                var fx=x0+6,fy=y+headerH+cardPad;
+                doc.setFillColor(tint(bc,.12)[0],tint(bc,.12)[1],tint(bc,.12)[2]);doc.setDrawColor(bc[0],bc[1],bc[2]);doc.roundedRect(cx+cardW-24,cy+3,18,6,3,3,'FD');
+                doc.setFont('helvetica','bold');doc.setFontSize(6.1);doc.setTextColor(bc[0],bc[1],bc[2]);doc.text(badge.toUpperCase(),cx+cardW-15,cy+6,{align:'center',baseline:'middle'});
+                var fx=cx+6,fy=cy+headerH+cardPad;
                 fieldLines.forEach(function(f){
                     doc.setFont('helvetica','bold');doc.setFontSize(labelFs);doc.setTextColor(106,116,128);doc.text(f.label.toUpperCase(),fx,fy,{baseline:'top'});
                     doc.setFont('helvetica','normal');doc.setFontSize(fieldFs);doc.setTextColor(26,31,38);doc.text(f.lines,fx,fy+lh(labelFs),{baseline:'top'});
                     fy+=lh(labelFs)+Math.max(1,f.lines.length)*lh(fieldFs)+rowGap;
                 });
-                y+=cardH+4;
+                col.y+=cardH+4;
             });
+            y=Math.max.apply(null,cols.map(function(cn){return cn.y}));
             y+=2;
         });
         return doc;
