@@ -545,6 +545,7 @@
             <div class="fb-group"><label>Generate</label><select id="huddleCount"><option>5</option><option>10</option><option selected>15</option><option>20</option><option>25</option><option>30</option></select></div>
             <div class="fb-group"><label>Group by</label><select id="huddleGroupBy" onchange="App.renderHuddle()"></select></div>
             <div class="fb-group"><label>Sort by</label><select id="huddleSortBy" onchange="App.renderHuddle()"></select></div>
+            <div class="fb-group"><label>Status</label><select id="huddleStatusFilter" onchange="App.huddleSelected={};App.renderHuddle()"><option value="all">All</option><option value="pending">Pending</option><option value="unused">Unused</option><option value="used">Used</option></select></div>
             <button class="btn btn-p" onclick="App.showHuddleGenerateModal()">Generate</button>
             <button class="btn" id="huddleUndoBtn" onclick="App.undoHuddlePending()">Undo Pending</button>
             <button class="btn" onclick="App.showHuddleAdd()">+ Add Member</button>
@@ -2575,7 +2576,9 @@ var App={
     huddleStatus:function(m){return this.hval(m,'Huddle Status')||'unused'},
     huddleRows:function(){
         var q=(document.getElementById('huddleSearch')?document.getElementById('huddleSearch').value:'').toLowerCase().trim();
+        var status=(document.getElementById('huddleStatusFilter')?document.getElementById('huddleStatusFilter').value:'all');
         var rows=this.members.filter(function(m){return App.isInHuddle(m)});
+        if(status&&status!=='all')rows=rows.filter(function(m){return App.huddleStatus(m)===status});
         if(q)rows=rows.filter(function(m){
             return [App.hMemberId(m),App.hName(m),App.pcpOf(m),App.hCM(m),App.hTier(m),App.hval(m,'Huddle Notes'),App.hval(m,'Last Discussed'),App.huddleStatus(m)].join(' ').toLowerCase().indexOf(q)>-1;
         });
@@ -2597,15 +2600,16 @@ var App={
     },
     getHuddleViewSettings:function(){try{return JSON.parse(localStorage.getItem('mm_huddle_view')||'{}')}catch(e){return{}}},
     saveHuddleViewSettings:function(){
-        var g=document.getElementById('huddleGroupBy'),s=document.getElementById('huddleSortBy'),c=document.getElementById('huddleCount');
-        localStorage.setItem('mm_huddle_view',JSON.stringify({groupBy:g?g.value:'pcp',sortBy:s?s.value:'last',count:c?c.value:'15'}));
+        var g=document.getElementById('huddleGroupBy'),s=document.getElementById('huddleSortBy'),c=document.getElementById('huddleCount'),f=document.getElementById('huddleStatusFilter');
+        localStorage.setItem('mm_huddle_view',JSON.stringify({groupBy:g?g.value:'pcp',sortBy:s?s.value:'last',count:c?c.value:'15',status:f?f.value:'all'}));
     },
     applyHuddleViewSettings:function(){
         if(this._huddleViewSettingsApplied)return;
-        var cfg=this.getHuddleViewSettings(),g=document.getElementById('huddleGroupBy'),s=document.getElementById('huddleSortBy'),c=document.getElementById('huddleCount');
+        var cfg=this.getHuddleViewSettings(),g=document.getElementById('huddleGroupBy'),s=document.getElementById('huddleSortBy'),c=document.getElementById('huddleCount'),f=document.getElementById('huddleStatusFilter');
         if(g&&cfg.groupBy)g.value=cfg.groupBy;
         if(s&&cfg.sortBy)s.value=cfg.sortBy;
         if(c&&cfg.count)c.value=cfg.count;
+        if(f&&cfg.status)f.value=cfg.status;
         this._huddleViewSettingsApplied=true;
     },
     renderHuddle:function(){
