@@ -2694,7 +2694,7 @@ var App={
     toggleHuddleSelectAll:function(checked){var self=this;if(checked)this.huddleRows().forEach(function(m){self.huddleSelected[m.id]=true});else this.huddleSelected={};this.renderHuddle()},
     clearHuddleSelection:function(){this.huddleSelected={};this.renderHuddle()},
     updateHuddleBulkBar:function(){var n=Object.keys(this.huddleSelected||{}).length,bar=document.getElementById('huddleBulkBar');if(!bar)return;bar.style.display=n?'flex':'none';document.getElementById('huddleBulkCount').textContent=n+' selected'},
-    huddleBulk:function(action){var ids=Object.keys(this.huddleSelected||{}),self=this,changed=[];ids.forEach(function(id){var m=self.members.find(function(x){return x.id===id});if(m)changed.push(m)});if(action==='pending'||changed.some(function(m){return App.huddleStatus(m)==='pending'}))this.captureHuddleUndo('Bulk huddle change',changed);changed.forEach(function(m){if(action==='remove'){self.clearHuddleFields(m);return}self.setHval(m,'Huddle Status',action)});this.huddleSelected={};this.writeMemberCSV();this.render();this.renderHuddle();this.toast('Huddle updated','success')},
+    huddleBulk:function(action){var ids=Object.keys(this.huddleSelected||{}),self=this,changed=[];ids.forEach(function(id){var m=self.members.find(function(x){return x.id===id});if(m)changed.push(m)});changed.forEach(function(m){if(action==='remove'){self.clearHuddleFields(m);return}self.setHval(m,'Huddle Status',action)});this.huddleSelected={};this.writeMemberCSV();this.render();this.renderHuddle();this.toast('Huddle updated','success')},
     huddleGenGroup:function(m,kind){
         if(kind==='provider')return this.pcpOf(m)||'No PCP';
         return this.hCM(m)||'Unassigned CM';
