@@ -1494,14 +1494,16 @@ var App={
             headers.forEach(function(h,i){if(h)rowObj[h]=(r[i]||'').trim()});
             var id=firstVal(rowObj,['ID'])||(r[0]||'').trim();
             var memberId=firstVal(rowObj,['Member ID','memberId','MemberID'])||(r[1]||'').trim();
+            var hasHuddleData=HUDDLE_ID_COLS.concat(HUDDLE_COLS).some(function(h){return rowObj[h]&&String(rowObj[h]).trim()});
+            if(!hasHuddleData)(self.huddleHeaders||[]).forEach(function(h){if(rowObj[h]&&String(rowObj[h]).trim())hasHuddleData=true});
             var noteMid=self.noteMemberIdCol>=0?(r[self.noteMemberIdCol]||'').trim():'';
             var noteText=self.noteCol>=0?(r[self.noteCol]||'').trim():'';
             // If row has noteMemberID and note filled but no member name → it's a note row
             if(noteMid&&noteText&&!memberId){
                 var ts=self.noteTimestampCol>=0?(r[self.noteTimestampCol]||'').trim():'';
                 self.notes.push({id:id,memberId:noteMid,ts:ts,note:noteText});
-            }else if(memberId){
-                var m={id:id,memberId:memberId,
+            }else if(memberId||hasHuddleData){
+                var m={id:id||String(self.nextMid++),memberId:memberId,
                     name:firstVal(rowObj,['Name','Member Name','Patient Name'])||(r[2]||'').trim(),
                     tier:firstVal(rowObj,['Tier','Metal Tier'])||(r[3]||'').trim(),
                     nextCall:firstVal(rowObj,['Next Call','NextCall'])||(r[4]||'').trim(),
