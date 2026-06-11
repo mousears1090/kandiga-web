@@ -2714,6 +2714,38 @@ var App={
         }
         return quotas;
     },
+    normalizeHuddleQuotas:function(stats,quotas,total,changedName){
+        var out={},max={},sum=0,target=Math.max(0,parseInt(total||0,10)||0);
+        stats.forEach(function(s){
+            var q=Math.max(0,parseInt(quotas&&quotas[s.name]||0,10)||0);
+            max[s.name]=s.max;out[s.name]=Math.min(q,s.max,target);sum+=out[s.name];
+        });
+        if(sum>target){
+            stats.slice().reverse().forEach(function(s){
+                if(sum<=target)return;
+                if(s.name===changedName)return;
+                var take=Math.min(out[s.name],sum-target);
+                out[s.name]-=take;sum-=take;
+            });
+            if(sum>target&&changedName&&out[changedName]){
+                var takeChanged=Math.min(out[changedName],sum-target);
+                out[changedName]-=takeChanged;sum-=takeChanged;
+            }
+        }
+        if(sum<target){
+            stats.forEach(function(s){
+                if(sum>=target)return;
+                if(s.name===changedName)return;
+                var add=Math.min(max[s.name]-out[s.name],target-sum);
+                if(add>0){out[s.name]+=add;sum+=add}
+            });
+            if(sum<target&&changedName&&max[changedName]!=null){
+                var addChanged=Math.min(max[changedName]-out[changedName],target-sum);
+                if(addChanged>0){out[changedName]+=addChanged;sum+=addChanged}
+            }
+        }
+        return out;
+    },
     renderGenerateTable:function(kind,stats,quotas,activeCustom){
         if(!stats.length)return '<div style="font-size:12px;color:var(--t3)">No huddle patients in this group yet.</div>';
         return '<table class="gen-table"><thead><tr><th>'+ (kind==='provider'?'Provider':'Case Manager') +'</th><th>Not used</th><th>Used fallback</th><th>Max</th><th>Pick</th></tr></thead><tbody>'
@@ -2725,7 +2757,9 @@ var App={
     },
     huddleGenerateQuotaEdited:function(input){
         this.setHuddleGenerateMode(input.getAttribute('data-kind')==='provider'?'customProvider':'customCm');
+        this.huddleQuotaChanged=decodeURIComponent(input.getAttribute('data-group')||'');
         this.renderHuddleGeneratePlan(true);
+        this.huddleQuotaChanged='';
     },
     showHuddleGenerateModal:function(){
         var saved=this.getHuddleGenerateSettings(),count=(document.getElementById('huddleCount')||{}).value||saved.total||15;
@@ -2742,6 +2776,8 @@ var App={
         var live=keepInputs?this.readHuddleGenerateSettings():null;
         var pQuotas=mode==='customProvider'&&keepInputs?Object.assign({},pEven,live.providerQuotas||{}):(mode==='customProvider'?Object.assign({},pEven,saved.providerQuotas||{}):pEven);
         var cQuotas=mode==='customCm'&&keepInputs?Object.assign({},cEven,live.cmQuotas||{}):(mode==='customCm'?Object.assign({},cEven,saved.cmQuotas||{}):cEven);
+        if(mode==='customProvider')pQuotas=this.normalizeHuddleQuotas(pStats,pQuotas,total,this.huddleQuotaChanged);
+        if(mode==='customCm')cQuotas=this.normalizeHuddleQuotas(cStats,cQuotas,total,this.huddleQuotaChanged);
         document.getElementById('genProviderPlan').innerHTML=this.renderGenerateTable('provider',pStats,pQuotas,mode==='customProvider');
         document.getElementById('genCmPlan').innerHTML=this.renderGenerateTable('cm',cStats,cQuotas,mode==='customCm');
         var activeKind=(mode==='evenCm'||mode==='customCm')?'cm':'provider',quotas=activeKind==='cm'?cQuotas:pQuotas,stats=activeKind==='cm'?cStats:pStats;
@@ -2763,7 +2799,7 @@ var App={
     generateHuddleFromModal:function(){
         var s=this.readHuddleGenerateSettings(),kind=(s.mode==='evenCm'||s.mode==='customCm')?'cm':'provider',stats=this.huddleGroupStats(kind,s.prefer),quotas;
         if(s.mode==='evenCm'||s.mode==='evenProvider')quotas=this.evenHuddleQuotas(stats,s.total);
-        else quotas=kind==='cm'?s.cmQuotas:s.providerQuotas;
+        else quotas=this.normalizeHuddleQuotas(stats,kind==='cm'?s.cmQuotas:s.providerQuotas,s.total);
         this.saveHuddleGenerateSettings(Object.assign({},s,kind==='cm'?{cmQuotas:quotas}:{providerQuotas:quotas}));
         document.getElementById('huddleCount').value=String(s.total);this.saveHuddleViewSettings();
         this.generateHuddle({kind:kind,quotas:quotas,prefer:s.prefer});
