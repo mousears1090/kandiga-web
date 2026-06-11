@@ -2579,6 +2579,11 @@ var App={
     hTier:function(m){return this.hval(m,'Huddle Tier')||m.tier||''},
     pcpOf:function(m){return this.hval(m,'Huddle PCP')||m.pcp||(m.extra&&(m.extra.PCP||m.extra.Provider||m.extra['Primary Care Provider']))||''},
     customHuddleCols:function(){var fixed={};HUDDLE_ID_COLS.concat(HUDDLE_COLS).forEach(function(h){fixed[h]=true});return (this.huddleHeaders||[]).filter(function(h){return h&&!fixed[h]})},
+    clearHuddleFields:function(m){
+        if(!m)return;
+        var cols=HUDDLE_ID_COLS.concat(HUDDLE_COLS).concat(this.customHuddleCols());
+        cols.forEach(function(h){if(m.extra)delete m.extra[h]});
+    },
     isInHuddle:function(m){return !!(this.hval(m,'Huddle Status')||parseInt(this.hval(m,'Times Discussed')||'0',10)>0)},
     huddleStatus:function(m){return this.hval(m,'Huddle Status')||'unused'},
     huddleRows:function(){
@@ -2679,7 +2684,7 @@ var App={
     },
     updateHuddleStatusOnly:function(id,status){var m=this.members.find(function(x){return x.id===id});if(!m)return;this.setHval(m,'Huddle Status',status);this.writeMemberCSV();this.renderHuddle();this.toast('Saved','success')},
     markHuddle:function(id,status){var m=this.members.find(function(x){return x.id===id});if(!m)return;this.setHval(m,'Huddle Status',status);this.writeMemberCSV();this.renderHuddle()},
-    removeFromHuddle:function(id){var m=this.members.find(function(x){return x.id===id});if(!m)return;HUDDLE_COLS.forEach(function(h){App.setHval(m,h,'')});delete this.huddleSelected[id];this.writeMemberCSV();this.renderHuddle()},
+    removeFromHuddle:function(id){var m=this.members.find(function(x){return x.id===id});if(!m)return;this.clearHuddleFields(m);delete this.huddleSelected[id];this.writeMemberCSV();this.render();this.renderHuddle();this.toast('Removed from huddle','success')},
     toggleHuddleEditMode:function(){this.huddleEditMode=!this.huddleEditMode;this.renderHuddle()},
     showHuddleAdd:function(){this.huddleEditId=null;document.getElementById('hmTitle').textContent='Add Huddle Member';document.getElementById('hmForm').reset();document.getElementById('hmStatus').value='unused';document.getElementById('hmTimes').value='0';document.getElementById('huddleMemberModal').classList.add('open');this.lockScroll();setTimeout(function(){document.getElementById('hmMemberId').focus()},50)},
     showHuddleEdit:function(id){var m=this.members.find(function(x){return x.id===id});if(!m)return;this.huddleEditId=id;document.getElementById('hmTitle').textContent='Edit Huddle Member';document.getElementById('hmMemberId').value=this.hMemberId(m);document.getElementById('hmName').value=this.hName(m);document.getElementById('hmPCP').value=this.pcpOf(m);document.getElementById('hmCM').value=this.hCM(m);document.getElementById('hmTier').value=this.hTier(m);document.getElementById('hmStatus').value=this.huddleStatus(m);document.getElementById('hmTimes').value=this.hval(m,'Times Discussed')||'0';document.getElementById('hmLast').value=this.hval(m,'Last Discussed')||'';document.getElementById('hmNotes').value=this.hval(m,'Huddle Notes')||'';document.getElementById('huddleMemberModal').classList.add('open');this.lockScroll()},
@@ -2689,7 +2694,7 @@ var App={
     toggleHuddleSelectAll:function(checked){var self=this;if(checked)this.huddleRows().forEach(function(m){self.huddleSelected[m.id]=true});else this.huddleSelected={};this.renderHuddle()},
     clearHuddleSelection:function(){this.huddleSelected={};this.renderHuddle()},
     updateHuddleBulkBar:function(){var n=Object.keys(this.huddleSelected||{}).length,bar=document.getElementById('huddleBulkBar');if(!bar)return;bar.style.display=n?'flex':'none';document.getElementById('huddleBulkCount').textContent=n+' selected'},
-    huddleBulk:function(action){var ids=Object.keys(this.huddleSelected||{}),self=this,changed=[];ids.forEach(function(id){var m=self.members.find(function(x){return x.id===id});if(m)changed.push(m)});if(action==='pending'||changed.some(function(m){return App.huddleStatus(m)==='pending'}))this.captureHuddleUndo('Bulk huddle change',changed);changed.forEach(function(m){if(action==='remove'){HUDDLE_COLS.forEach(function(h){self.setHval(m,h,'')});return}self.setHval(m,'Huddle Status',action)});this.huddleSelected={};this.writeMemberCSV();this.renderHuddle();this.toast('Huddle updated','success')},
+    huddleBulk:function(action){var ids=Object.keys(this.huddleSelected||{}),self=this,changed=[];ids.forEach(function(id){var m=self.members.find(function(x){return x.id===id});if(m)changed.push(m)});if(action==='pending'||changed.some(function(m){return App.huddleStatus(m)==='pending'}))this.captureHuddleUndo('Bulk huddle change',changed);changed.forEach(function(m){if(action==='remove'){self.clearHuddleFields(m);return}self.setHval(m,'Huddle Status',action)});this.huddleSelected={};this.writeMemberCSV();this.render();this.renderHuddle();this.toast('Huddle updated','success')},
     huddleGenGroup:function(m,kind){
         if(kind==='provider')return this.pcpOf(m)||'No PCP';
         return this.hCM(m)||'Unassigned CM';
