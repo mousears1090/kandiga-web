@@ -3115,8 +3115,20 @@ var App={
             for(var ci=0;ci<colCount;ci++)cols.push({x:x0+ci*(cardW+gap),y:y});
             groups[g].forEach(function(m){
                 var title=self.hName(m)||'Unnamed',sub=[self.hMemberId(m),self.hCM(m)?'CM: '+self.hCM(m):'',self.pcpOf(m)?'PCP: '+self.pcpOf(m):''].filter(Boolean).join('  |  ');
-                var fieldLines=[];defs.forEach(function(f){if(f.key==='name')return;var v=f.get(m);if(v)fieldLines.push({label:f.label,value:v,lines:textLines(v,cardW-12,fieldFs).slice(0,compact?3:6)})});
-                var fieldH=0;fieldLines.forEach(function(f){fieldH+=lh(labelFs)+Math.max(1,f.lines.length)*lh(fieldFs)+rowGap});
+                var innerW=cardW-12,fieldGap=4,halfW=(innerW-fieldGap)/2,maxLines=compact?3:6,fieldBlocks=[],fieldRows=[];
+                defs.forEach(function(f){
+                    if(f.key==='name')return;
+                    var v=f.get(m);if(!v)return;
+                    var raw=String(v),halfLines=textLines(raw,halfW,fieldFs).slice(0,maxLines),fullLines=textLines(raw,innerW,fieldFs).slice(0,maxLines);
+                    var span=(f.key==='notes'||raw.length>28||halfLines.length>1)?2:1,lines=span===2?fullLines:halfLines;
+                    fieldBlocks.push({label:f.label,value:raw,span:span,lines:lines,h:lh(labelFs)+Math.max(1,lines.length)*lh(fieldFs)});
+                });
+                fieldBlocks.forEach(function(f){
+                    var last=fieldRows[fieldRows.length-1];
+                    if(f.span===2||!last||last.length===2||last[0].span===2)fieldRows.push([f]);
+                    else last.push(f);
+                });
+                var fieldH=0;fieldRows.forEach(function(r,i){fieldH+=Math.max.apply(null,r.map(function(f){return f.h}));if(i<fieldRows.length-1)fieldH+=rowGap});
                 var subLines=textLines(sub,Math.max(36,cardW-42),8).slice(0,2);
                 var headerH=Math.max(14,5+lh(11)+subLines.length*lh(8));
                 var cardH=Math.max(26,headerH+cardPad+fieldH+cardPad),col=cols.slice().sort(function(a,b){return a.y-b.y})[0];
@@ -3136,10 +3148,14 @@ var App={
                 doc.setFillColor(tint(bc,.12)[0],tint(bc,.12)[1],tint(bc,.12)[2]);doc.setDrawColor(bc[0],bc[1],bc[2]);doc.roundedRect(cx+cardW-24,cy+3,18,6,3,3,'FD');
                 doc.setFont('helvetica','bold');doc.setFontSize(6.1);doc.setTextColor(bc[0],bc[1],bc[2]);doc.text(badge.toUpperCase(),cx+cardW-15,cy+6,{align:'center',baseline:'middle'});
                 var fx=cx+6,fy=cy+headerH+cardPad;
-                fieldLines.forEach(function(f){
-                    doc.setFont('helvetica','bold');doc.setFontSize(labelFs);doc.setTextColor(106,116,128);doc.text(f.label.toUpperCase(),fx,fy,{baseline:'top'});
-                    doc.setFont('helvetica','normal');doc.setFontSize(fieldFs);doc.setTextColor(26,31,38);doc.text(f.lines,fx,fy+lh(labelFs),{baseline:'top'});
-                    fy+=lh(labelFs)+Math.max(1,f.lines.length)*lh(fieldFs)+rowGap;
+                fieldRows.forEach(function(row,ri){
+                    var rowH=Math.max.apply(null,row.map(function(f){return f.h}));
+                    row.forEach(function(f,fi){
+                        var fw=row.length===1&&f.span===2?innerW:halfW,fxi=fx+(fi*(halfW+fieldGap));
+                        doc.setFont('helvetica','bold');doc.setFontSize(labelFs);doc.setTextColor(106,116,128);doc.text(f.label.toUpperCase(),fxi,fy,{baseline:'top'});
+                        doc.setFont('helvetica','normal');doc.setFontSize(fieldFs);doc.setTextColor(26,31,38);doc.text(f.lines,fxi,fy+lh(labelFs),{baseline:'top'});
+                    });
+                    fy+=rowH+(ri<fieldRows.length-1?rowGap:0);
                 });
                 col.y+=cardH+4;
             });
