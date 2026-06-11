@@ -681,7 +681,6 @@
                 <div class="fi"><label>Rows</label><select id="pdfScope" onchange="App.updateHuddlePDFPreview()"><option value="pending">Pending only</option><option value="active">Pending + unused</option><option value="selected">Selected only</option><option value="filtered">Current filtered view</option><option value="allNotUsed">All non-used huddle patients</option><option value="all">All huddle patients</option></select></div>
                 <div class="fi"><label>Group By</label><select id="pdfGroupBy" onchange="App.updateHuddlePDFPreview()"></select></div>
                 <div class="fi"><label>Sort By</label><select id="pdfSortBy" onchange="App.updateHuddlePDFPreview()"></select></div>
-                <div class="fi"><label>Layout</label><select id="pdfColumns" onchange="App.updateHuddlePDFPreview()"><option value="auto">Auto columns</option><option value="2">Two columns</option><option value="1">One column</option></select></div>
                 <div class="fi"><label>Card Detail</label><select id="pdfDensity" onchange="App.updateHuddlePDFPreview()"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div>
             </div>
             <div class="pdf-option-box">
@@ -2981,7 +2980,6 @@ var App={
             scope:'pending',
             groupBy:(document.getElementById('huddleGroupBy')||{}).value||'pcp',
             sortBy:(document.getElementById('huddleSortBy')||{}).value||'last',
-            columns:'auto',
             density:'comfortable',
             finalize:true,
             statuses:{pending:true,unused:false,used:false},
@@ -3000,7 +2998,7 @@ var App={
         return Object.assign(def,saved);
     },
     saveHuddlePDFSettings:function(){
-        var s={version:2,title:document.getElementById('pdfTitle').value.trim()||'High-Risk Huddle',subtitle:document.getElementById('pdfSubtitle').value.trim(),fileName:document.getElementById('pdfFileName').value.trim()||'high-risk-huddle.pdf',scope:document.getElementById('pdfScope').value,groupBy:document.getElementById('pdfGroupBy').value,sortBy:document.getElementById('pdfSortBy').value,columns:document.getElementById('pdfColumns').value,density:document.getElementById('pdfDensity').value,finalize:document.getElementById('pdfFinalize').checked,statuses:{},fields:{},labels:{}};
+        var s={version:2,title:document.getElementById('pdfTitle').value.trim()||'High-Risk Huddle',subtitle:document.getElementById('pdfSubtitle').value.trim(),fileName:document.getElementById('pdfFileName').value.trim()||'high-risk-huddle.pdf',scope:document.getElementById('pdfScope').value,groupBy:document.getElementById('pdfGroupBy').value,sortBy:document.getElementById('pdfSortBy').value,density:document.getElementById('pdfDensity').value,finalize:document.getElementById('pdfFinalize').checked,statuses:{},fields:{},labels:{}};
         document.querySelectorAll('#pdfStatusFields input').forEach(function(cb){s.statuses[cb.value]=cb.checked});
         document.querySelectorAll('#pdfFieldList input[type=checkbox]').forEach(function(cb){s.fields[cb.value]=cb.checked});
         document.querySelectorAll('#pdfFieldList input[data-label-key]').forEach(function(inp){s.labels[inp.getAttribute('data-label-key')]=inp.value.trim()});
@@ -3028,7 +3026,6 @@ var App={
         document.getElementById('pdfSubtitle').value=s.subtitle||'';
         document.getElementById('pdfFileName').value=s.fileName||'high-risk-huddle.pdf';
         document.getElementById('pdfScope').value=s.scope||'pending';
-        document.getElementById('pdfColumns').value=s.columns||'auto';
         document.getElementById('pdfDensity').value=s.density||'comfortable';
         document.getElementById('pdfFinalize').checked=s.finalize!==false;
         var opts='<option value="pcp">PCP</option><option value="cm">Case Manager</option><option value="status">Status</option><option value="none">No grouping</option>';
@@ -3038,7 +3035,7 @@ var App={
         document.getElementById('pdfStatusFields').innerHTML=['pending','unused','used'].map(function(st){return '<label class="pdf-check"><input type="checkbox" value="'+st+'" '+(s.statuses&&s.statuses[st]?'checked':'')+' onchange="App.updateHuddlePDFPreview()"><span>'+st+'</span></label>'}).join('');
         var fields=[{key:'name',label:'Name'}].concat(this.huddlePDFFieldDefs());
         document.getElementById('pdfFieldList').innerHTML=fields.map(function(f){var label=s.labels&&s.labels[f.key]||f.label;return '<div class="pdf-field-row"><label class="pdf-check"><input type="checkbox" value="'+self.esc(f.key)+'" '+(s.fields&&s.fields[f.key]?'checked':'')+' onchange="App.updateHuddlePDFPreview()"><span>'+self.esc(f.label)+'</span></label><input class="pdf-label-input" data-label-key="'+self.esc(f.key)+'" value="'+self.esc(label)+'" oninput="App.updateHuddlePDFPreview()"></div>'}).join('');
-        ['pdfTitle','pdfSubtitle','pdfFileName','pdfScope','pdfGroupBy','pdfSortBy','pdfColumns','pdfDensity','pdfFinalize'].forEach(function(id){document.getElementById(id).oninput=function(){App.updateHuddlePDFPreview()};document.getElementById(id).onchange=function(){App.updateHuddlePDFPreview()}});
+        ['pdfTitle','pdfSubtitle','pdfFileName','pdfScope','pdfGroupBy','pdfSortBy','pdfDensity','pdfFinalize'].forEach(function(id){document.getElementById(id).oninput=function(){App.updateHuddlePDFPreview()};document.getElementById(id).onchange=function(){App.updateHuddlePDFPreview()}});
         document.getElementById('huddlePdfModal').classList.add('open');this.lockScroll();this.updateHuddlePDFPreview();
     },
     hideHuddlePDFModal:function(){document.getElementById('huddlePdfModal').classList.remove('open');this.unlockScroll()},
@@ -3111,8 +3108,7 @@ var App={
             doc.setFillColor(tc[0],tc[1],tc[2]);doc.roundedRect(x0,y,contentW,8,2,2,'F');
             doc.setFillColor(c[0],c[1],c[2]);doc.rect(x0,y,2,8,'F');
             doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(17,24,39);doc.text(g+'  ('+groups[g].length+')',x0+5,y+4,{baseline:'middle'});y+=11;
-            var colCount=settings.columns==='1'?1:(settings.columns==='2'?2:2),gap=4,cardW=colCount===1?contentW:(contentW-gap)/2,cols=[];
-            for(var ci=0;ci<colCount;ci++)cols.push({x:x0+ci*(cardW+gap),y:y});
+            var cardW=contentW;
             groups[g].forEach(function(m){
                 var title=self.hName(m)||'Unnamed',sub=[self.hMemberId(m),self.hCM(m)?'CM: '+self.hCM(m):'',self.pcpOf(m)?'PCP: '+self.pcpOf(m):''].filter(Boolean).join('  |  ');
                 var innerW=cardW-12,fieldGap=4,halfW=(innerW-fieldGap)/2,maxLines=compact?3:6,fieldBlocks=[],fieldRows=[];
@@ -3131,13 +3127,8 @@ var App={
                 var fieldH=0;fieldRows.forEach(function(r,i){fieldH+=Math.max.apply(null,r.map(function(f){return f.h}));if(i<fieldRows.length-1)fieldH+=rowGap});
                 var subLines=textLines(sub,Math.max(36,cardW-42),8).slice(0,2);
                 var headerH=Math.max(14,5+lh(11)+subLines.length*lh(8));
-                var cardH=Math.max(26,headerH+cardPad+fieldH+cardPad),col=cols.slice().sort(function(a,b){return a.y-b.y})[0];
-                if(col.y+cardH>bottom){
-                    var roomy=cols.filter(function(cn){return cn.y+cardH<=bottom}).sort(function(a,b){return a.y-b.y})[0];
-                    if(roomy)col=roomy;
-                    else{doc.addPage();cols.forEach(function(cn){cn.y=mT});col=cols[0]}
-                }
-                var cx=col.x,cy=col.y;
+                var cardH=Math.max(26,headerH+cardPad+fieldH+cardPad);ensure(cardH+4);
+                var cx=x0,cy=y;
                 doc.setDrawColor(201,209,217);doc.setFillColor(255,255,255);doc.roundedRect(cx,cy,cardW,cardH,2,2,'FD');
                 doc.setFillColor(243,245,248);doc.roundedRect(cx,cy,cardW,headerH,2,2,'F');
                 doc.setFillColor(c[0],c[1],c[2]);doc.roundedRect(cx+4,cy+3,7,7,1.5,1.5,'F');
@@ -3157,9 +3148,8 @@ var App={
                     });
                     fy+=rowH+(ri<fieldRows.length-1?rowGap:0);
                 });
-                col.y+=cardH+4;
+                y+=cardH+4;
             });
-            y=Math.max.apply(null,cols.map(function(cn){return cn.y}));
             y+=2;
         });
         return doc;
