@@ -681,6 +681,7 @@
                 <div class="fi"><label>Rows</label><select id="pdfScope" onchange="App.updateHuddlePDFPreview()"><option value="pending">Pending only</option><option value="active">Pending + unused</option><option value="selected">Selected only</option><option value="filtered">Current filtered view</option><option value="allNotUsed">All non-used huddle patients</option><option value="all">All huddle patients</option></select></div>
                 <div class="fi"><label>Group By</label><select id="pdfGroupBy" onchange="App.updateHuddlePDFPreview()"></select></div>
                 <div class="fi"><label>Sort By</label><select id="pdfSortBy" onchange="App.updateHuddlePDFPreview()"></select></div>
+                <div class="fi"><label>Pill Field</label><select id="pdfPillField" onchange="App.updateHuddlePDFPreview()"></select></div>
                 <div class="fi"><label>Patients Per Row</label><select id="pdfPatientColumns" onchange="App.updateHuddlePDFPreview()"><option value="1">1 patient</option><option value="2">2 patients</option></select></div>
                 <div class="fi"><label>Fields Per Patient Row</label><select id="pdfFieldColumns" onchange="App.updateHuddlePDFPreview()"><option value="1">1 field</option><option value="2">2 fields</option><option value="3">3 fields</option></select></div>
                 <div class="fi"><label>Card Detail</label><select id="pdfDensity" onchange="App.updateHuddlePDFPreview()"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div>
@@ -2799,30 +2800,44 @@ var App={
         document.getElementById('genCmSummary').textContent=cStats.length+' CMs';
         document.getElementById('genPreviewText').textContent='This plan will create '+planned+' pending patients using '+(activeKind==='cm'?'CM':'provider')+' counts.'+(remaining?' Allocate '+remaining+' more to reach the target.':'');
     },
-    selectHuddleByQuotas:function(kind,quotas,prefer){
+    selectHuddleByQuotas:function(kind,quotas,prefer,secondaryKind,secondaryQuotas){
         var pools=this.huddleGeneratePools(prefer),selected=[],seen={},self=this,p={},f={};
         this.huddleCandidateSort(pools.primary).forEach(function(m){var k=self.huddleGenGroup(m,kind);(p[k]=p[k]||[]).push(m)});
         this.huddleCandidateSort(pools.fallback).forEach(function(m){var k=self.huddleGenGroup(m,kind);(f[k]=f[k]||[]).push(m)});
-        Object.keys(quotas).sort().forEach(function(k){
-            var need=parseInt(quotas[k]||0,10)||0,first=(p[k]||[]).slice(0,need),more=(f[k]||[]).slice(0,Math.max(0,need-first.length));
-            first.concat(more).forEach(function(m){if(!seen[m.id]){seen[m.id]=true;selected.push(m)}});
-        });
+        var primaryNeed={};Object.keys(quotas||{}).forEach(function(k){primaryNeed[k]=parseInt(quotas[k]||0,10)||0});
+        var secondaryCounts={},rank={},candidates=[];
+        this.huddleCandidateSort(pools.primary).concat(this.huddleCandidateSort(pools.fallback)).forEach(function(m,i){if(!rank[m.id])rank[m.id]=i+1;candidates.push(m)});
+        while(Object.keys(primaryNeed).some(function(k){return primaryNeed[k]>0})){
+            var best=null,bestScore=-1e9;
+            candidates.forEach(function(m){
+                if(seen[m.id])return;
+                var pk=self.huddleGenGroup(m,kind);if((primaryNeed[pk]||0)<=0)return;
+                var sk=secondaryKind?self.huddleGenGroup(m,secondaryKind):'',secTarget=parseInt((secondaryQuotas||{})[sk]||0,10)||0,secCount=secondaryCounts[sk]||0,secNeed=secTarget-secCount;
+                var score=(secNeed>0?10000+secNeed*100:-Math.abs(secNeed)*20)-rank[m.id];
+                if(score>bestScore){bestScore=score;best=m}
+            });
+            if(!best)break;
+            seen[best.id]=true;selected.push(best);
+            var pk=this.huddleGenGroup(best,kind),sk=secondaryKind?this.huddleGenGroup(best,secondaryKind):'';
+            primaryNeed[pk]--;if(sk)secondaryCounts[sk]=(secondaryCounts[sk]||0)+1;
+        }
         return selected;
     },
     generateHuddleFromModal:function(){
-        var s=this.readHuddleGenerateSettings(),kind=(s.mode==='evenCm'||s.mode==='customCm')?'cm':'provider',stats=this.huddleGroupStats(kind,s.prefer),quotas;
-        if(s.mode==='evenCm'||s.mode==='evenProvider')quotas=this.evenHuddleQuotas(stats,s.total);
-        else quotas=this.normalizeHuddleQuotas(stats,kind==='cm'?s.cmQuotas:s.providerQuotas,s.total);
+        var s=this.readHuddleGenerateSettings(),kind=(s.mode==='evenCm'||s.mode==='customCm')?'cm':'provider',secondaryKind=kind==='cm'?'provider':'cm',stats=this.huddleGroupStats(kind,s.prefer),pStats=this.huddleGroupStats('provider',s.prefer),cStats=this.huddleGroupStats('cm',s.prefer),quotas,providerQuotas,cmQuotas;
+        providerQuotas=(s.mode==='evenProvider')?this.evenHuddleQuotas(pStats,s.total):this.normalizeHuddleQuotas(pStats,s.providerQuotas,s.total);
+        cmQuotas=(s.mode==='evenCm')?this.evenHuddleQuotas(cStats,s.total):this.normalizeHuddleQuotas(cStats,s.cmQuotas,s.total);
+        quotas=kind==='cm'?cmQuotas:providerQuotas;
         var planned=stats.reduce(function(sum,g){return sum+Math.min(parseInt(quotas[g.name]||0,10),g.max)},0),available=stats.reduce(function(sum,g){return sum+g.max},0),target=Math.min(s.total,available);
         if((s.mode==='customCm'||s.mode==='customProvider')&&planned<target){this.toast('Allocate '+(target-planned)+' more before generating','danger');this.renderHuddleGeneratePlan(true);return}
-        this.saveHuddleGenerateSettings(Object.assign({},s,kind==='cm'?{cmQuotas:quotas}:{providerQuotas:quotas}));
+        this.saveHuddleGenerateSettings(Object.assign({},s,{providerQuotas:providerQuotas,cmQuotas:cmQuotas}));
         document.getElementById('huddleCount').value=String(s.total);this.saveHuddleViewSettings();
-        this.generateHuddle({kind:kind,quotas:quotas,prefer:s.prefer});
+        this.generateHuddle({kind:kind,quotas:quotas,prefer:s.prefer,secondaryKind:secondaryKind,secondaryQuotas:secondaryKind==='cm'?cmQuotas:providerQuotas});
         this.hideHuddleGenerateModal();
     },
     generateHuddle:function(plan){
         if(!plan){this.showHuddleGenerateModal();return}
-        var selected=this.selectHuddleByQuotas(plan.kind,plan.quotas,plan.prefer),pool=this.members.filter(function(m){return App.isInHuddle(m)});
+        var selected=this.selectHuddleByQuotas(plan.kind,plan.quotas,plan.prefer,plan.secondaryKind,plan.secondaryQuotas),pool=this.members.filter(function(m){return App.isInHuddle(m)});
         pool.forEach(function(m){if(App.huddleStatus(m)==='pending')App.setHval(m,'Huddle Status','unused')});
         selected.forEach(function(m){App.setHval(m,'Huddle Status','pending')});
         this.writeMemberCSV();this.renderHuddle();this.toast('Generated '+selected.length+' pending for huddle','success');
@@ -2982,6 +2997,7 @@ var App={
             scope:'pending',
             groupBy:(document.getElementById('huddleGroupBy')||{}).value||'pcp',
             sortBy:(document.getElementById('huddleSortBy')||{}).value||'last',
+            pillField:'status',
             patientColumns:'1',
             fieldColumns:'2',
             density:'comfortable',
@@ -3002,7 +3018,7 @@ var App={
         return Object.assign(def,saved);
     },
     saveHuddlePDFSettings:function(){
-        var s={version:2,title:document.getElementById('pdfTitle').value.trim()||'High-Risk Huddle',subtitle:document.getElementById('pdfSubtitle').value.trim(),fileName:document.getElementById('pdfFileName').value.trim()||'high-risk-huddle.pdf',scope:document.getElementById('pdfScope').value,groupBy:document.getElementById('pdfGroupBy').value,sortBy:document.getElementById('pdfSortBy').value,patientColumns:document.getElementById('pdfPatientColumns').value,fieldColumns:document.getElementById('pdfFieldColumns').value,density:document.getElementById('pdfDensity').value,finalize:document.getElementById('pdfFinalize').checked,statuses:{},fields:{},labels:{}};
+        var s={version:2,title:document.getElementById('pdfTitle').value.trim()||'High-Risk Huddle',subtitle:document.getElementById('pdfSubtitle').value.trim(),fileName:document.getElementById('pdfFileName').value.trim()||'high-risk-huddle.pdf',scope:document.getElementById('pdfScope').value,groupBy:document.getElementById('pdfGroupBy').value,sortBy:document.getElementById('pdfSortBy').value,pillField:document.getElementById('pdfPillField').value,patientColumns:document.getElementById('pdfPatientColumns').value,fieldColumns:document.getElementById('pdfFieldColumns').value,density:document.getElementById('pdfDensity').value,finalize:document.getElementById('pdfFinalize').checked,statuses:{},fields:{},labels:{}};
         document.querySelectorAll('#pdfStatusFields input').forEach(function(cb){s.statuses[cb.value]=cb.checked});
         document.querySelectorAll('#pdfFieldList input[type=checkbox]').forEach(function(cb){s.fields[cb.value]=cb.checked});
         document.querySelectorAll('#pdfFieldList input[data-label-key]').forEach(function(inp){s.labels[inp.getAttribute('data-label-key')]=inp.value.trim()});
@@ -3038,10 +3054,12 @@ var App={
         document.getElementById('pdfGroupBy').innerHTML=opts;document.getElementById('pdfGroupBy').value=s.groupBy||'pcp';
         document.getElementById('pdfSortBy').innerHTML='<option value="last">Last Discussed</option><option value="pcp">PCP</option><option value="cm">Case Manager</option><option value="times">Times Discussed</option><option value="name">Name</option><option value="status">Status</option>';
         document.getElementById('pdfSortBy').value=s.sortBy||'last';
-        document.getElementById('pdfStatusFields').innerHTML=['pending','unused','used'].map(function(st){return '<label class="pdf-check"><input type="checkbox" value="'+st+'" '+(s.statuses&&s.statuses[st]?'checked':'')+' onchange="App.updateHuddlePDFPreview()"><span>'+st+'</span></label>'}).join('');
         var fields=[{key:'name',label:'Name'}].concat(this.huddlePDFFieldDefs());
+        document.getElementById('pdfPillField').innerHTML=fields.map(function(f){return '<option value="'+self.esc(f.key)+'">'+self.esc(f.label)+'</option>'}).join('');
+        document.getElementById('pdfPillField').value=s.pillField||'status';
+        document.getElementById('pdfStatusFields').innerHTML=['pending','unused','used'].map(function(st){return '<label class="pdf-check"><input type="checkbox" value="'+st+'" '+(s.statuses&&s.statuses[st]?'checked':'')+' onchange="App.updateHuddlePDFPreview()"><span>'+st+'</span></label>'}).join('');
         document.getElementById('pdfFieldList').innerHTML=fields.map(function(f){var label=s.labels&&s.labels[f.key]||f.label;return '<div class="pdf-field-row"><label class="pdf-check"><input type="checkbox" value="'+self.esc(f.key)+'" '+(s.fields&&s.fields[f.key]?'checked':'')+' onchange="App.updateHuddlePDFPreview()"><span>'+self.esc(f.label)+'</span></label><input class="pdf-label-input" data-label-key="'+self.esc(f.key)+'" value="'+self.esc(label)+'" oninput="App.updateHuddlePDFPreview()"></div>'}).join('');
-        ['pdfTitle','pdfSubtitle','pdfFileName','pdfScope','pdfGroupBy','pdfSortBy','pdfPatientColumns','pdfFieldColumns','pdfDensity','pdfFinalize'].forEach(function(id){document.getElementById(id).oninput=function(){App.updateHuddlePDFPreview()};document.getElementById(id).onchange=function(){App.updateHuddlePDFPreview()}});
+        ['pdfTitle','pdfSubtitle','pdfFileName','pdfScope','pdfGroupBy','pdfSortBy','pdfPillField','pdfPatientColumns','pdfFieldColumns','pdfDensity','pdfFinalize'].forEach(function(id){document.getElementById(id).oninput=function(){App.updateHuddlePDFPreview()};document.getElementById(id).onchange=function(){App.updateHuddlePDFPreview()}});
         document.getElementById('huddlePdfModal').classList.add('open');this.lockScroll();this.updateHuddlePDFPreview();
     },
     hideHuddlePDFModal:function(){document.getElementById('huddlePdfModal').classList.remove('open');this.unlockScroll()},
@@ -3101,7 +3119,7 @@ var App={
         function ensure(h){if(y+h>bottom){doc.addPage();y=mT}}
         function tint(c,a){return c.map(function(v){return Math.round(v*a+255*(1-a))})}
         function textLines(txt,w,fs){doc.setFontSize(fs);return doc.splitTextToSize(String(txt||''),w)}
-        var chosen=settings.fields||{},labels=settings.labels||{},defs=[{key:'name',label:'Name',get:function(m){return self.hName(m)||'Unnamed'}}].concat(this.huddlePDFFieldDefs()).map(function(f){return Object.assign({},f,{label:labels[f.key]||f.label})}).filter(function(f){return chosen[f.key]});
+        var chosen=settings.fields||{},labels=settings.labels||{},allDefs=[{key:'name',label:'Name',get:function(m){return self.hName(m)||'Unnamed'}}].concat(this.huddlePDFFieldDefs()).map(function(f){return Object.assign({},f,{label:labels[f.key]||f.label})}),defs=allDefs.filter(function(f){return chosen[f.key]}),pillDef=allDefs.find(function(f){return f.key===(settings.pillField||'status')})||allDefs.find(function(f){return f.key==='status'});
         var compact=settings.density==='compact',fieldFs=compact?7.6:8.4,labelFs=compact?6.2:6.8,rowGap=compact?1.6:2.4,cardPad=compact?4:5;
         doc.setTextColor(17,24,39);doc.setFont('helvetica','bold');doc.setFontSize(21);doc.text(settings.title||'High-Risk Huddle',x0,y,{baseline:'top'});y+=lh(21)+1;
         if(settings.subtitle){doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(91,101,115);doc.text(settings.subtitle,x0,y,{baseline:'top'});y+=lh(10)+1}
@@ -3150,9 +3168,9 @@ var App={
                 doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(7);doc.text((title||'?').charAt(0).toUpperCase(),cx+7.5,cy+6.7,{align:'center',baseline:'middle'});
                 doc.setTextColor(17,24,39);doc.setFontSize(11);doc.text(textLines(title,Math.max(36,cardW-44),11).slice(0,1),cx+14,cy+3.2,{baseline:'top'});
                 doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(91,101,115);doc.text(subLines,cx+14,cy+8,{baseline:'top'});
-                var badge=self.huddleStatus(m),bc=badge==='used'?[21,128,61]:(badge==='pending'?[124,58,237]:[180,83,9]);
-                doc.setFillColor(tint(bc,.12)[0],tint(bc,.12)[1],tint(bc,.12)[2]);doc.setDrawColor(bc[0],bc[1],bc[2]);doc.roundedRect(cx+cardW-24,cy+3,18,6,3,3,'FD');
-                doc.setFont('helvetica','bold');doc.setFontSize(6.1);doc.setTextColor(bc[0],bc[1],bc[2]);doc.text(badge.toUpperCase(),cx+cardW-15,cy+6,{align:'center',baseline:'middle'});
+                var status=self.huddleStatus(m),badge=String((pillDef&&pillDef.get(m))||status||'').trim()||status,badgeW=Math.min(cardW-34,Math.max(18,badge.length*2.2+8)),bc=status==='used'?[21,128,61]:(status==='pending'?[124,58,237]:[180,83,9]);
+                doc.setFillColor(tint(bc,.12)[0],tint(bc,.12)[1],tint(bc,.12)[2]);doc.setDrawColor(bc[0],bc[1],bc[2]);doc.roundedRect(cx+cardW-badgeW-6,cy+3,badgeW,6,3,3,'FD');
+                doc.setFont('helvetica','bold');doc.setFontSize(6.1);doc.setTextColor(bc[0],bc[1],bc[2]);doc.text(textLines(badge.toUpperCase(),badgeW-3,6.1).slice(0,1),cx+cardW-badgeW/2-6,cy+6,{align:'center',baseline:'middle'});
                 var fx=cx+6,fy=cy+headerH+cardPad;
                 fieldRows.forEach(function(row,ri){
                     var rowH=Math.max.apply(null,row.map(function(f){return f.h})),offset=0;
