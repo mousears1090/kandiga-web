@@ -398,7 +398,8 @@
         .status-unused{color:var(--amb);background:var(--amb-bg);border-color:var(--amb-bd)}
         .status-used{color:var(--grn);background:var(--grn-bg);border-color:var(--grn-bd)}
         .status-pending{color:#7c3aed;background:rgba(124,58,237,.07);border-color:rgba(124,58,237,.25)}
-        .hud-input,.hud-ta,.hud-select{width:100%;min-width:90px;padding:6px 8px;font-family:var(--font);font-size:13px;background:var(--bg-1);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);outline:none}
+        .hud-input,.hud-ta,.hud-select{width:100%;min-width:90px;padding:6px 8px;font-family:var(--font);font-size:13px;background:var(--bg-1);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);outline:none;box-sizing:border-box}
+        .hud-input-sm{min-width:68px}
         .hud-ta{min-width:220px;min-height:36px;resize:vertical;line-height:1.35}
         .hud-input:focus,.hud-ta:focus,.hud-select:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-bg)}
         .hud-read{color:var(--t2);white-space:normal;min-width:80px}
@@ -415,6 +416,16 @@
         .pdf-check input{width:15px;height:15px;accent-color:var(--acc);flex-shrink:0}
         .pdf-check span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .pdf-summary{font-size:12px;color:var(--t3);margin-top:10px}
+        .gen-mode-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:14px}
+        .gen-mode{display:flex;align-items:flex-start;gap:8px;padding:10px;border:1px solid var(--bd);border-radius:var(--r);background:var(--bg-1);cursor:pointer}
+        .gen-mode input{margin-top:2px;accent-color:var(--acc)}
+        .gen-mode b{display:block;font-size:13px;color:var(--t1)}
+        .gen-mode span{display:block;font-size:11px;color:var(--t3);line-height:1.35;margin-top:2px}
+        .gen-table{width:100%;border-collapse:collapse;font-size:13px}
+        .gen-table th{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--t3);text-align:left;padding:7px 8px;border-bottom:1px solid var(--bd)}
+        .gen-table td{padding:7px 8px;border-bottom:1px solid #f0f1f4;color:var(--t2);vertical-align:middle}
+        .gen-table input{width:70px;padding:6px 8px;font-family:var(--font);font-size:13px;background:var(--bg-1);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1)}
+        .gen-table .grp-name{font-weight:700;color:var(--t1)}
     </style>
 </head>
 <body>
@@ -534,7 +545,7 @@
             <div class="fb-group"><label>Generate</label><select id="huddleCount"><option>5</option><option>10</option><option selected>15</option><option>20</option><option>25</option><option>30</option></select></div>
             <div class="fb-group"><label>Group by</label><select id="huddleGroupBy" onchange="App.renderHuddle()"></select></div>
             <div class="fb-group"><label>Sort by</label><select id="huddleSortBy" onchange="App.renderHuddle()"></select></div>
-            <button class="btn btn-p" onclick="App.generateHuddle()">Generate</button>
+            <button class="btn btn-p" onclick="App.showHuddleGenerateModal()">Generate</button>
             <button class="btn" onclick="App.showHuddleAdd()">+ Add Member</button>
             <button class="btn" id="huddleEditModeBtn" onclick="App.toggleHuddleEditMode()">Edit Mode</button>
             <button class="btn" onclick="App.pickImportType('huddle')">Import Huddle CSV</button>
@@ -552,7 +563,7 @@
         <div class="table-wrap"><div class="table-scroll">
             <table class="data-table" id="huddleTable"><thead><tr id="huddleHeadRow">
                 <th class="cell-check"><input type="checkbox" onchange="App.toggleHuddleSelectAll(this.checked)"></th>
-                <th>Member ID</th><th>Name</th><th>PCP</th><th>Case Manager</th><th>Times</th><th>Last Discussed</th><th>Status</th><th>Huddle Notes</th><th></th>
+                <th>Member ID</th><th>Name</th><th>PCP</th><th>Case Manager</th><th>Tier</th><th>Times</th><th>Last Discussed</th><th>Status</th><th>Huddle Notes</th><th></th>
             </tr></thead><tbody id="huddleBody"></tbody></table>
         </div>
         <div class="empty-state" id="huddleEmpty"><div class="empty-icon">+</div><h3>No huddle patients</h3><p>Import a huddle CSV or add members from this tab.</p></div>
@@ -612,6 +623,7 @@
         <div class="fi"><label>Name</label><input type="text" id="hmName"></div>
         <div class="fi"><label>PCP</label><input type="text" id="hmPCP"></div>
         <div class="fi"><label>Case Manager</label><input type="text" id="hmCM"></div>
+        <div class="fi"><label>Tier</label><input type="text" id="hmTier"></div>
         <div class="fi"><label>Status</label><select id="hmStatus"><option value="unused">unused</option><option value="pending">pending</option><option value="used">used</option></select></div>
         <div class="fi"><label>Times Discussed</label><input type="number" id="hmTimes" min="0" value="0"></div>
         <div class="fi"><label>Last Discussed</label><input type="date" id="hmLast"></div>
@@ -619,6 +631,35 @@
         <button type="submit" style="display:none">Submit</button>
     </form></div>
     <div class="mf"><button class="btn" onclick="App.hideHuddleModal()">Cancel</button><button class="btn btn-p" onclick="document.getElementById('hmForm').requestSubmit()">Save</button></div>
+    </div>
+</div>
+
+<!-- HUDDLE GENERATE MODAL -->
+<div class="mo" id="huddleGenerateModal" onclick="if(event.target===this)App.hideHuddleGenerateModal()">
+    <div class="modal" style="max-width:860px;max-height:86vh;display:flex;flex-direction:column;overflow:hidden">
+        <div class="mh"><h2>Generate Huddle List</h2><button class="mx" onclick="App.hideHuddleGenerateModal()">&times;</button></div>
+        <div class="mb" style="flex:1;overflow-y:auto">
+            <div class="fg">
+                <div class="fi"><label>Total Patients</label><input type="number" id="genTotal" min="1" value="15" oninput="App.renderHuddleGeneratePlan()"></div>
+                <div class="fi"><label>Prefer</label><select id="genPrefer" onchange="App.renderHuddleGeneratePlan()"><option value="fresh">Not-used first, then oldest used</option><option value="freshOnly">Not-used only</option><option value="all">Any huddle patient</option></select></div>
+            </div>
+            <div class="gen-mode-row">
+                <label class="gen-mode"><input type="radio" name="genMode" value="evenProvider" onchange="App.renderHuddleGeneratePlan()"><span><b>Even by provider</b><span>Split the total across providers.</span></span></label>
+                <label class="gen-mode"><input type="radio" name="genMode" value="customProvider" onchange="App.renderHuddleGeneratePlan()"><span><b>Custom by provider</b><span>Choose exactly how many per provider.</span></span></label>
+                <label class="gen-mode"><input type="radio" name="genMode" value="evenCm" onchange="App.renderHuddleGeneratePlan()"><span><b>Even by CM</b><span>Split the total across case managers.</span></span></label>
+                <label class="gen-mode"><input type="radio" name="genMode" value="customCm" onchange="App.renderHuddleGeneratePlan()"><span><b>Custom by CM</b><span>Choose exactly how many per case manager.</span></span></label>
+            </div>
+            <div class="pdf-option-box">
+                <div class="pdf-option-head"><label id="genProviderTitle">Provider Plan</label><span id="genProviderSummary" style="font-size:11px;color:var(--t3)"></span></div>
+                <div id="genProviderPlan"></div>
+            </div>
+            <div class="pdf-option-box">
+                <div class="pdf-option-head"><label id="genCmTitle">CM Plan</label><span id="genCmSummary" style="font-size:11px;color:var(--t3)"></span></div>
+                <div id="genCmPlan"></div>
+            </div>
+            <div class="pdf-summary" id="genPreviewText"></div>
+        </div>
+        <div class="mf"><button class="btn" onclick="App.hideHuddleGenerateModal()">Cancel</button><button class="btn btn-p" onclick="App.generateHuddleFromModal()">Generate Pending List</button></div>
     </div>
 </div>
 
@@ -2024,6 +2065,7 @@ var App={
         if(this.currentView==='calendar'){this.renderCalendar()}
     },
     esc:function(s){if(s==null)return'';var d=document.createElement('div');d.textContent=String(s);return d.innerHTML},
+    jsArg:function(s){return JSON.stringify(String(s==null?'':s))},
     fmtTime:function(iso){try{var d=new Date(iso);return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+' at '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}catch(e){return iso}},
     rowClick:function(e,id){if(e.target.closest('button'))return;this.showNotesModal(id)},
     lockScroll:function(){document.body.classList.add('no-scroll')},
@@ -2552,14 +2594,15 @@ var App={
     },
     getHuddleViewSettings:function(){try{return JSON.parse(localStorage.getItem('mm_huddle_view')||'{}')}catch(e){return{}}},
     saveHuddleViewSettings:function(){
-        var g=document.getElementById('huddleGroupBy'),s=document.getElementById('huddleSortBy');
-        localStorage.setItem('mm_huddle_view',JSON.stringify({groupBy:g?g.value:'pcp',sortBy:s?s.value:'last'}));
+        var g=document.getElementById('huddleGroupBy'),s=document.getElementById('huddleSortBy'),c=document.getElementById('huddleCount');
+        localStorage.setItem('mm_huddle_view',JSON.stringify({groupBy:g?g.value:'pcp',sortBy:s?s.value:'last',count:c?c.value:'15'}));
     },
     applyHuddleViewSettings:function(){
         if(this._huddleViewSettingsApplied)return;
-        var cfg=this.getHuddleViewSettings(),g=document.getElementById('huddleGroupBy'),s=document.getElementById('huddleSortBy');
+        var cfg=this.getHuddleViewSettings(),g=document.getElementById('huddleGroupBy'),s=document.getElementById('huddleSortBy'),c=document.getElementById('huddleCount');
         if(g&&cfg.groupBy)g.value=cfg.groupBy;
         if(s&&cfg.sortBy)s.value=cfg.sortBy;
+        if(c&&cfg.count)c.value=cfg.count;
         this._huddleViewSettingsApplied=true;
     },
     renderHuddle:function(){
@@ -2576,53 +2619,159 @@ var App={
         var editBtn=document.getElementById('huddleEditModeBtn');if(editBtn)editBtn.textContent=this.huddleEditMode?'View Mode':'Edit Mode';
         var body=document.getElementById('huddleBody'),empty=document.getElementById('huddleEmpty'),table=document.getElementById('huddleTable'),head=document.getElementById('huddleHeadRow'),self=this,customCols=this.customHuddleCols();
         if(head)head.innerHTML='<th class="cell-check"><input type="checkbox" onchange="App.toggleHuddleSelectAll(this.checked)"></th>'
-            +'<th>Member ID</th><th>Name</th><th>PCP</th><th>Case Manager</th><th>Times</th><th>Last Discussed</th><th>Status</th><th>Huddle Notes</th>'
+            +'<th>Member ID</th><th>Name</th><th>PCP</th><th>Case Manager</th><th>Tier</th><th>Times</th><th>Last Discussed</th><th>Status</th><th>Huddle Notes</th>'
             +customCols.map(function(h){return '<th>'+self.esc(h)+'</th>'}).join('')+'<th></th>';
         if(!rows.length){table.style.display='none';empty.style.display='block';this.updateHuddleBulkBar();return}
         table.style.display='';empty.style.display='none';
         body.innerHTML=rows.map(function(m){
             var st=self.huddleStatus(m),cls=st==='pending'?'status-pending':(st==='used'?'status-used':'status-unused');
-            var statusControl=self.huddleEditMode
-                ?'<select class="hud-select" onchange="App.updateHuddleStatusOnly(\''+m.id+'\',this.value)"><option value="unused"'+(st==='unused'?' selected':'')+'>unused</option><option value="pending"'+(st==='pending'?' selected':'')+'>pending</option><option value="used"'+(st==='used'?' selected':'')+'>used</option></select>'
-                :'<span class="status-pill '+cls+'">'+self.esc(st)+'</span>';
+            var statusControl=self.huddleEditMode?self.huddleStatusSelect(m.id,st):'<span class="status-pill '+cls+'">'+self.esc(st)+'</span>';
             return '<tr class="'+(self.huddleSelected[m.id]?'selected':'')+'">'
                 +'<td class="cell-check"><input type="checkbox"'+(self.huddleSelected[m.id]?' checked':'')+' onclick="App.toggleHuddleSelect(\''+m.id+'\',this.checked)"></td>'
-                +'<td class="cell-id">'+self.esc(self.hMemberId(m))+'</td>'
-                +'<td><div class="hud-read">'+self.esc(self.hName(m))+'</div></td>'
-                +'<td><div class="hud-read">'+self.esc(self.pcpOf(m))+'</div></td>'
-                +'<td><div class="hud-read">'+self.esc(self.hCM(m))+'</div></td>'
-                +'<td><div class="hud-read">'+self.esc(self.hval(m,'Times Discussed')||'0')+'</div></td>'
-                +'<td><div class="hud-read">'+self.esc(self.hval(m,'Last Discussed'))+'</div></td>'
+                +'<td class="cell-id">'+self.huddleEditCell(m.id,'Huddle Member ID',self.hMemberId(m),'text','hud-input-sm')+'</td>'
+                +'<td>'+self.huddleEditCell(m.id,'Huddle Name',self.hName(m))+'</td>'
+                +'<td>'+self.huddleEditCell(m.id,'Huddle PCP',self.pcpOf(m))+'</td>'
+                +'<td>'+self.huddleEditCell(m.id,'Huddle Case Manager',self.hCM(m))+'</td>'
+                +'<td>'+self.huddleEditCell(m.id,'Huddle Tier',self.hTier(m),'text','hud-input-sm')+'</td>'
+                +'<td>'+self.huddleEditCell(m.id,'Times Discussed',self.hval(m,'Times Discussed')||'0','number','hud-input-sm')+'</td>'
+                +'<td>'+self.huddleEditCell(m.id,'Last Discussed',self.hval(m,'Last Discussed'),'date','hud-input-sm')+'</td>'
                 +'<td>'+statusControl+'</td>'
-                +'<td><div class="hud-note-read">'+self.esc(self.hval(m,'Huddle Notes'))+'</div></td>'
-                +customCols.map(function(h){return '<td><div class="hud-read">'+self.esc(self.hval(m,h))+'</div></td>'}).join('')
+                +'<td>'+self.huddleEditCell(m.id,'Huddle Notes',self.hval(m,'Huddle Notes'),'textarea')+'</td>'
+                +customCols.map(function(h){return '<td>'+self.huddleEditCell(m.id,h,self.hval(m,h))+'</td>'}).join('')
                 +'<td class="cell-actions"><button class="btn btn-sm" onclick="App.showHuddleEdit(\''+m.id+'\')">Edit</button> <button class="btn btn-sm" onclick="App.markHuddle(\''+m.id+'\',\''+(st==='pending'?'unused':'pending')+'\')">'+(st==='pending'?'Unpend':'Pending')+'</button> <button class="btn btn-sm btn-d" onclick="App.removeFromHuddle(\''+m.id+'\')">&times;</button></td>'
                 +'</tr>';
         }).join('');
         this.updateHuddleBulkBar();
     },
+    huddleEditCell:function(id,h,v,type,cls){
+        if(!this.huddleEditMode){
+            if(h==='Huddle Notes')return '<div class="hud-note-read">'+this.esc(v)+'</div>';
+            return '<div class="hud-read">'+this.esc(v)+'</div>';
+        }
+        var hid=this.jsArg(h);
+        if(type==='textarea')return '<textarea class="hud-ta" onblur="App.updateHuddleField(\''+id+'\','+hid+',this.value)">'+this.esc(v)+'</textarea>';
+        return '<input class="hud-input '+(cls||'')+'" type="'+(type||'text')+'" value="'+this.esc(v)+'" onblur="App.updateHuddleField(\''+id+'\','+hid+',this.value)">';
+    },
+    huddleStatusSelect:function(id,st){
+        return '<select class="hud-select" onchange="App.updateHuddleStatusOnly(\''+id+'\',this.value)"><option value="unused"'+(st==='unused'?' selected':'')+'>unused</option><option value="pending"'+(st==='pending'?' selected':'')+'>pending</option><option value="used"'+(st==='used'?' selected':'')+'>used</option></select>';
+    },
     updateHuddleField:function(id,h,v){var m=this.members.find(function(x){return x.id===id});if(!m)return;this.setHval(m,h,v);this.writeMemberCSV();this.renderHuddle();this.toast('Saved','success')},
-    updateHuddleIdentity:function(id,key,v){var m=this.members.find(function(x){return x.id===id});if(!m)return;if(key==='name')m.name=v;else if(key==='cm')m.cm=v;else this.setExtraVal(m,key,v);this.writeMemberCSV();this.render();this.renderHuddle();this.toast('Saved','success')},
+    updateHuddleIdentity:function(id,key,v){var m=this.members.find(function(x){return x.id===id});if(!m)return;var map={name:'Huddle Name',pcp:'Huddle PCP',cm:'Huddle Case Manager',tier:'Huddle Tier'};this.setHval(m,map[key]||key,v);this.writeMemberCSV();this.render();this.renderHuddle();this.toast('Saved','success')},
     updateHuddleStatusOnly:function(id,status){var m=this.members.find(function(x){return x.id===id});if(!m)return;this.setHval(m,'Huddle Status',status);this.writeMemberCSV();this.renderHuddle();this.toast('Saved','success')},
     markHuddle:function(id,status){var m=this.members.find(function(x){return x.id===id});if(!m)return;this.setHval(m,'Huddle Status',status);this.writeMemberCSV();this.renderHuddle()},
     removeFromHuddle:function(id){var m=this.members.find(function(x){return x.id===id});if(!m)return;HUDDLE_COLS.forEach(function(h){App.setHval(m,h,'')});delete this.huddleSelected[id];this.writeMemberCSV();this.renderHuddle()},
     toggleHuddleEditMode:function(){this.huddleEditMode=!this.huddleEditMode;this.renderHuddle()},
     showHuddleAdd:function(){this.huddleEditId=null;document.getElementById('hmTitle').textContent='Add Huddle Member';document.getElementById('hmForm').reset();document.getElementById('hmStatus').value='unused';document.getElementById('hmTimes').value='0';document.getElementById('huddleMemberModal').classList.add('open');this.lockScroll();setTimeout(function(){document.getElementById('hmMemberId').focus()},50)},
-    showHuddleEdit:function(id){var m=this.members.find(function(x){return x.id===id});if(!m)return;this.huddleEditId=id;document.getElementById('hmTitle').textContent='Edit Huddle Member';document.getElementById('hmMemberId').value=this.hMemberId(m);document.getElementById('hmName').value=this.hName(m);document.getElementById('hmPCP').value=this.pcpOf(m);document.getElementById('hmCM').value=this.hCM(m);document.getElementById('hmStatus').value=this.huddleStatus(m);document.getElementById('hmTimes').value=this.hval(m,'Times Discussed')||'0';document.getElementById('hmLast').value=this.hval(m,'Last Discussed')||'';document.getElementById('hmNotes').value=this.hval(m,'Huddle Notes')||'';document.getElementById('huddleMemberModal').classList.add('open');this.lockScroll()},
+    showHuddleEdit:function(id){var m=this.members.find(function(x){return x.id===id});if(!m)return;this.huddleEditId=id;document.getElementById('hmTitle').textContent='Edit Huddle Member';document.getElementById('hmMemberId').value=this.hMemberId(m);document.getElementById('hmName').value=this.hName(m);document.getElementById('hmPCP').value=this.pcpOf(m);document.getElementById('hmCM').value=this.hCM(m);document.getElementById('hmTier').value=this.hTier(m);document.getElementById('hmStatus').value=this.huddleStatus(m);document.getElementById('hmTimes').value=this.hval(m,'Times Discussed')||'0';document.getElementById('hmLast').value=this.hval(m,'Last Discussed')||'';document.getElementById('hmNotes').value=this.hval(m,'Huddle Notes')||'';document.getElementById('huddleMemberModal').classList.add('open');this.lockScroll()},
     hideHuddleModal:function(){document.getElementById('huddleMemberModal').classList.remove('open');this.unlockScroll();this.huddleEditId=null},
-    submitHuddleMember:function(e){if(e)e.preventDefault();var mid=document.getElementById('hmMemberId').value.trim();if(!mid){this.toast('Member ID required','danger');return false}var m=this.huddleEditId?this.members.find(function(x){return x.id===App.huddleEditId}):this.members.find(function(x){return App.hMemberId(x)===mid});if(!m){m={id:String(this.nextMid++),memberId:'',name:'',tier:'',nextCall:'',callType:'',cm:'',active:true,extra:{}};this.members.push(m)}this.setHval(m,'Huddle Member ID',mid);this.setHval(m,'Huddle Name',document.getElementById('hmName').value.trim());this.setHval(m,'Huddle PCP',document.getElementById('hmPCP').value.trim());this.setHval(m,'Huddle Case Manager',document.getElementById('hmCM').value.trim());this.setHval(m,'Huddle Status',document.getElementById('hmStatus').value||'unused');this.setHval(m,'Times Discussed',document.getElementById('hmTimes').value||'0');this.setHval(m,'Last Discussed',document.getElementById('hmLast').value);this.setHval(m,'Huddle Notes',document.getElementById('hmNotes').value);this.writeMemberCSV();this.render();this.renderHuddle();this.hideHuddleModal();this.toast('Huddle member saved','success');return false},
+    submitHuddleMember:function(e){if(e)e.preventDefault();var mid=document.getElementById('hmMemberId').value.trim();if(!mid){this.toast('Member ID required','danger');return false}var m=this.huddleEditId?this.members.find(function(x){return x.id===App.huddleEditId}):this.members.find(function(x){return App.hMemberId(x)===mid});if(!m){m={id:String(this.nextMid++),memberId:'',name:'',tier:'',nextCall:'',callType:'',cm:'',active:true,extra:{}};this.members.push(m)}this.setHval(m,'Huddle Member ID',mid);this.setHval(m,'Huddle Name',document.getElementById('hmName').value.trim());this.setHval(m,'Huddle PCP',document.getElementById('hmPCP').value.trim());this.setHval(m,'Huddle Case Manager',document.getElementById('hmCM').value.trim());this.setHval(m,'Huddle Tier',document.getElementById('hmTier').value.trim());this.setHval(m,'Huddle Status',document.getElementById('hmStatus').value||'unused');this.setHval(m,'Times Discussed',document.getElementById('hmTimes').value||'0');this.setHval(m,'Last Discussed',document.getElementById('hmLast').value);this.setHval(m,'Huddle Notes',document.getElementById('hmNotes').value);this.writeMemberCSV();this.render();this.renderHuddle();this.hideHuddleModal();this.toast('Huddle member saved','success');return false},
     toggleHuddleSelect:function(id,checked){if(checked)this.huddleSelected[id]=true;else delete this.huddleSelected[id];this.updateHuddleBulkBar()},
     toggleHuddleSelectAll:function(checked){var self=this;if(checked)this.huddleRows().forEach(function(m){self.huddleSelected[m.id]=true});else this.huddleSelected={};this.renderHuddle()},
     clearHuddleSelection:function(){this.huddleSelected={};this.renderHuddle()},
     updateHuddleBulkBar:function(){var n=Object.keys(this.huddleSelected||{}).length,bar=document.getElementById('huddleBulkBar');if(!bar)return;bar.style.display=n?'flex':'none';document.getElementById('huddleBulkCount').textContent=n+' selected'},
     huddleBulk:function(action){var ids=Object.keys(this.huddleSelected||{}),self=this;ids.forEach(function(id){var m=self.members.find(function(x){return x.id===id});if(!m)return;if(action==='remove'){HUDDLE_COLS.forEach(function(h){self.setHval(m,h,'')});return}self.setHval(m,'Huddle Status',action)});this.huddleSelected={};this.writeMemberCSV();this.renderHuddle();this.toast('Huddle updated','success')},
-    generateHuddle:function(){
-        var n=parseInt(document.getElementById('huddleCount').value,10)||15;
-        var pool=this.members.filter(function(m){return App.isInHuddle(m)}),unused=pool.filter(function(m){return App.huddleStatus(m)==='unused'}),used=pool.filter(function(m){return App.huddleStatus(m)==='used'});
-        function key(m){return App.hCM(m)+'|'+(App.pcpOf(m)||'')}
-        function balanced(list,count){var out=[],b={};list.forEach(function(m){var k=key(m);(b[k]=b[k]||[]).push(m)});Object.keys(b).forEach(function(k){b[k].sort(function(){return Math.random()-.5})});while(out.length<count){var keys=Object.keys(b).filter(function(k){return b[k].length});if(!keys.length)break;keys.sort(function(a,bk){return b[a].length-b[bk].length});keys.forEach(function(k){if(out.length<count&&b[k].length)out.push(b[k].shift())})}return out}
-        used.sort(function(a,b){return (App.hval(a,'Last Discussed')||'0000').localeCompare(App.hval(b,'Last Discussed')||'0000')});
-        var selected=balanced(unused,n);if(selected.length<n)selected=selected.concat(used.slice(0,n-selected.length));
+    huddleGenGroup:function(m,kind){
+        if(kind==='provider')return this.pcpOf(m)||'No PCP';
+        return this.hCM(m)||'Unassigned CM';
+    },
+    huddleCandidateSort:function(list){
+        return list.slice().sort(function(a,b){
+            var ta=parseInt(App.hval(a,'Times Discussed')||'0',10),tb=parseInt(App.hval(b,'Times Discussed')||'0',10);
+            var la=App.hval(a,'Last Discussed')||'0000',lb=App.hval(b,'Last Discussed')||'0000';
+            return ta-tb||la.localeCompare(lb)||App.hName(a).localeCompare(App.hName(b));
+        });
+    },
+    getHuddleGenerateSettings:function(){try{return JSON.parse(localStorage.getItem('mm_huddle_generate')||'{}')}catch(e){return{}}},
+    saveHuddleGenerateSettings:function(s){localStorage.setItem('mm_huddle_generate',JSON.stringify(s||this.readHuddleGenerateSettings()))},
+    readHuddleGenerateSettings:function(){
+        var mode=(document.querySelector('input[name="genMode"]:checked')||{}).value||'evenProvider';
+        var s={mode:mode,total:parseInt(document.getElementById('genTotal').value,10)||15,prefer:document.getElementById('genPrefer').value,providerQuotas:{},cmQuotas:{}};
+        document.querySelectorAll('#genProviderPlan input[data-group]').forEach(function(i){s.providerQuotas[decodeURIComponent(i.getAttribute('data-group'))]=parseInt(i.value,10)||0});
+        document.querySelectorAll('#genCmPlan input[data-group]').forEach(function(i){s.cmQuotas[decodeURIComponent(i.getAttribute('data-group'))]=parseInt(i.value,10)||0});
+        return s;
+    },
+    huddleGeneratePools:function(prefer){
+        var pool=this.members.filter(function(m){return App.isInHuddle(m)});
+        if(prefer==='freshOnly')return {primary:pool.filter(function(m){return App.huddleStatus(m)!=='used'}),fallback:[]};
+        if(prefer==='all')return {primary:pool,fallback:[]};
+        return {primary:pool.filter(function(m){return App.huddleStatus(m)!=='used'}),fallback:pool.filter(function(m){return App.huddleStatus(m)==='used'})};
+    },
+    huddleGroupStats:function(kind,prefer){
+        var pools=this.huddleGeneratePools(prefer),stats={},self=this;
+        function ensure(k){if(!stats[k])stats[k]={name:k,primary:0,fallback:0,max:0};return stats[k]}
+        pools.primary.forEach(function(m){var s=ensure(self.huddleGenGroup(m,kind));s.primary++;s.max++});
+        pools.fallback.forEach(function(m){var s=ensure(self.huddleGenGroup(m,kind));s.fallback++;s.max++});
+        return Object.keys(stats).sort().map(function(k){return stats[k]});
+    },
+    evenHuddleQuotas:function(stats,total){
+        var quotas={},remaining=total,guard=0;
+        stats.forEach(function(s){quotas[s.name]=0});
+        while(remaining>0&&guard++<10000){
+            var choices=stats.filter(function(s){return quotas[s.name]<s.max});
+            if(!choices.length)break;
+            choices.sort(function(a,b){return quotas[a.name]-quotas[b.name]||b.max-a.max||a.name.localeCompare(b.name)});
+            quotas[choices[0].name]++;remaining--;
+        }
+        return quotas;
+    },
+    renderGenerateTable:function(kind,stats,quotas,activeCustom){
+        if(!stats.length)return '<div style="font-size:12px;color:var(--t3)">No huddle patients in this group yet.</div>';
+        return '<table class="gen-table"><thead><tr><th>'+ (kind==='provider'?'Provider':'Case Manager') +'</th><th>Not used</th><th>Used fallback</th><th>Max</th><th>Pick</th></tr></thead><tbody>'
+            +stats.map(function(s){var q=quotas[s.name]||0;return '<tr><td class="grp-name">'+App.esc(s.name)+'</td><td>'+s.primary+'</td><td>'+s.fallback+'</td><td>'+s.max+'</td><td><input type="number" min="0" max="'+s.max+'" value="'+q+'" data-kind="'+kind+'" data-group="'+encodeURIComponent(s.name)+'" oninput="App.huddleGenerateQuotaEdited(this)"></td></tr>'}).join('')
+            +'</tbody></table>';
+    },
+    setHuddleGenerateMode:function(mode){
+        document.querySelectorAll('input[name="genMode"]').forEach(function(r){r.checked=r.value===mode});
+    },
+    huddleGenerateQuotaEdited:function(input){
+        this.setHuddleGenerateMode(input.getAttribute('data-kind')==='provider'?'customProvider':'customCm');
+        this.renderHuddleGeneratePlan(true);
+    },
+    showHuddleGenerateModal:function(){
+        var saved=this.getHuddleGenerateSettings(),count=(document.getElementById('huddleCount')||{}).value||saved.total||15;
+        document.getElementById('genTotal').value=count||saved.total||15;
+        document.getElementById('genPrefer').value=saved.prefer||'fresh';
+        this.setHuddleGenerateMode(saved.mode||'evenProvider');
+        document.getElementById('huddleGenerateModal').classList.add('open');this.lockScroll();this.renderHuddleGeneratePlan();
+    },
+    hideHuddleGenerateModal:function(){document.getElementById('huddleGenerateModal').classList.remove('open');this.unlockScroll()},
+    renderHuddleGeneratePlan:function(keepInputs){
+        var saved=this.getHuddleGenerateSettings(),mode=(document.querySelector('input[name="genMode"]:checked')||{}).value||'evenProvider',total=parseInt(document.getElementById('genTotal').value,10)||15,prefer=document.getElementById('genPrefer').value;
+        var pStats=this.huddleGroupStats('provider',prefer),cStats=this.huddleGroupStats('cm',prefer);
+        var pEven=this.evenHuddleQuotas(pStats,total),cEven=this.evenHuddleQuotas(cStats,total);
+        var live=keepInputs?this.readHuddleGenerateSettings():null;
+        var pQuotas=mode==='customProvider'&&keepInputs?Object.assign({},pEven,live.providerQuotas||{}):(mode==='customProvider'?Object.assign({},pEven,saved.providerQuotas||{}):pEven);
+        var cQuotas=mode==='customCm'&&keepInputs?Object.assign({},cEven,live.cmQuotas||{}):(mode==='customCm'?Object.assign({},cEven,saved.cmQuotas||{}):cEven);
+        document.getElementById('genProviderPlan').innerHTML=this.renderGenerateTable('provider',pStats,pQuotas,mode==='customProvider');
+        document.getElementById('genCmPlan').innerHTML=this.renderGenerateTable('cm',cStats,cQuotas,mode==='customCm');
+        var activeKind=(mode==='evenCm'||mode==='customCm')?'cm':'provider',quotas=activeKind==='cm'?cQuotas:pQuotas,stats=activeKind==='cm'?cStats:pStats;
+        var planned=stats.reduce(function(sum,s){return sum+Math.min(parseInt(quotas[s.name]||0,10),s.max)},0);
+        document.getElementById('genProviderSummary').textContent=pStats.length+' providers';
+        document.getElementById('genCmSummary').textContent=cStats.length+' CMs';
+        document.getElementById('genPreviewText').textContent='This plan will create '+planned+' pending patients using '+(activeKind==='cm'?'CM':'provider')+' counts.';
+    },
+    selectHuddleByQuotas:function(kind,quotas,prefer){
+        var pools=this.huddleGeneratePools(prefer),selected=[],seen={},self=this,p={},f={};
+        this.huddleCandidateSort(pools.primary).forEach(function(m){var k=self.huddleGenGroup(m,kind);(p[k]=p[k]||[]).push(m)});
+        this.huddleCandidateSort(pools.fallback).forEach(function(m){var k=self.huddleGenGroup(m,kind);(f[k]=f[k]||[]).push(m)});
+        Object.keys(quotas).sort().forEach(function(k){
+            var need=parseInt(quotas[k]||0,10)||0,first=(p[k]||[]).slice(0,need),more=(f[k]||[]).slice(0,Math.max(0,need-first.length));
+            first.concat(more).forEach(function(m){if(!seen[m.id]){seen[m.id]=true;selected.push(m)}});
+        });
+        return selected;
+    },
+    generateHuddleFromModal:function(){
+        var s=this.readHuddleGenerateSettings(),kind=(s.mode==='evenCm'||s.mode==='customCm')?'cm':'provider',stats=this.huddleGroupStats(kind,s.prefer),quotas;
+        if(s.mode==='evenCm'||s.mode==='evenProvider')quotas=this.evenHuddleQuotas(stats,s.total);
+        else quotas=kind==='cm'?s.cmQuotas:s.providerQuotas;
+        this.saveHuddleGenerateSettings(Object.assign({},s,kind==='cm'?{cmQuotas:quotas}:{providerQuotas:quotas}));
+        document.getElementById('huddleCount').value=String(s.total);this.saveHuddleViewSettings();
+        this.generateHuddle({kind:kind,quotas:quotas,prefer:s.prefer});
+        this.hideHuddleGenerateModal();
+    },
+    generateHuddle:function(plan){
+        if(!plan){this.showHuddleGenerateModal();return}
+        var selected=this.selectHuddleByQuotas(plan.kind,plan.quotas,plan.prefer),pool=this.members.filter(function(m){return App.isInHuddle(m)});
         pool.forEach(function(m){if(App.huddleStatus(m)==='pending')App.setHval(m,'Huddle Status','unused')});
         selected.forEach(function(m){App.setHval(m,'Huddle Status','pending')});
         this.writeMemberCSV();this.renderHuddle();this.toast('Generated '+selected.length+' pending for huddle','success');
