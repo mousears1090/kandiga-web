@@ -2624,7 +2624,7 @@ var App={
             ['In huddle',all.length],['Pending',pending],['Unused',unused],['Used',used],['CMs',Object.keys(cms).length],['Providers',Object.keys(pcps).length]
         ].map(function(x){return '<div class="h-stat"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>'}).join('');
         var editBtn=document.getElementById('huddleEditModeBtn');if(editBtn)editBtn.textContent=this.huddleEditMode?'View Mode':'Edit Mode';
-        var undoBtn=document.getElementById('huddleUndoBtn');if(undoBtn){var u=this.getHuddleUndo();undoBtn.disabled=!u.items.length;undoBtn.textContent=u.items.length?'Undo Pending ('+u.items.length+')':'Undo Pending'}
+        var undoBtn=document.getElementById('huddleUndoBtn');if(undoBtn){undoBtn.disabled=!pending;undoBtn.textContent=pending?'Undo Pending ('+pending+')':'Undo Pending'}
         var body=document.getElementById('huddleBody'),empty=document.getElementById('huddleEmpty'),table=document.getElementById('huddleTable'),head=document.getElementById('huddleHeadRow'),self=this,customCols=this.customHuddleCols();
         if(head)head.innerHTML='<th class="cell-check"><input type="checkbox" onchange="App.toggleHuddleSelectAll(this.checked)"></th>'
             +'<th>Member ID</th><th>Name</th><th>PCP</th><th>Case Manager</th><th>Tier</th><th>Times</th><th>Last Discussed</th><th>Status</th><th>Huddle Notes</th>'
@@ -2665,16 +2665,13 @@ var App={
     },
     updateHuddleField:function(id,h,v){var m=this.members.find(function(x){return x.id===id});if(!m)return;this.setHval(m,h,v);this.writeMemberCSV();this.renderHuddle();this.toast('Saved','success')},
     updateHuddleIdentity:function(id,key,v){var m=this.members.find(function(x){return x.id===id});if(!m)return;var map={name:'Huddle Name',pcp:'Huddle PCP',cm:'Huddle Case Manager',tier:'Huddle Tier'};this.setHval(m,map[key]||key,v);this.writeMemberCSV();this.render();this.renderHuddle();this.toast('Saved','success')},
-    getHuddleUndo:function(){try{return JSON.parse(localStorage.getItem('mm_huddle_undo')||'{"items":[]}')}catch(e){return{items:[]}}},
-    setHuddleUndo:function(label,items){localStorage.setItem('mm_huddle_undo',JSON.stringify({label:label||'Pending change',items:items||[]}))},
-    captureHuddleUndo:function(label,list){this.setHuddleUndo(label,(list||[]).map(function(m){return{id:m.id,status:App.huddleStatus(m)}}))},
     undoHuddlePending:function(){
-        var u=this.getHuddleUndo(),n=0;
-        (u.items||[]).forEach(function(it){var m=App.members.find(function(x){return x.id===it.id});if(m){App.setHval(m,'Huddle Status',it.status||'unused');n++}});
-        this.setHuddleUndo('',[]);if(n)this.writeMemberCSV();this.renderHuddle();this.toast(n?'Restored '+n+' huddle statuses':'Nothing to undo',n?'success':'info');
+        var ids=Object.keys(this.huddleSelected||{}),targets=(ids.length?ids.map(function(id){return App.members.find(function(m){return m.id===id})}).filter(Boolean):this.members.filter(function(m){return App.isInHuddle(m)})).filter(function(m){return App.huddleStatus(m)==='pending'}),n=0;
+        targets.forEach(function(m){App.setHval(m,'Huddle Status','unused');n++});
+        this.huddleSelected={};if(n)this.writeMemberCSV();this.renderHuddle();this.toast(n?'Moved '+n+' pending to unused':'No pending selected',n?'success':'info');
     },
-    updateHuddleStatusOnly:function(id,status){var m=this.members.find(function(x){return x.id===id});if(!m)return;if(status==='pending'||this.huddleStatus(m)==='pending')this.captureHuddleUndo('Status change',[m]);this.setHval(m,'Huddle Status',status);this.writeMemberCSV();this.renderHuddle();this.toast('Saved','success')},
-    markHuddle:function(id,status){var m=this.members.find(function(x){return x.id===id});if(!m)return;if(status==='pending'||this.huddleStatus(m)==='pending')this.captureHuddleUndo('Pending toggle',[m]);this.setHval(m,'Huddle Status',status);this.writeMemberCSV();this.renderHuddle()},
+    updateHuddleStatusOnly:function(id,status){var m=this.members.find(function(x){return x.id===id});if(!m)return;this.setHval(m,'Huddle Status',status);this.writeMemberCSV();this.renderHuddle();this.toast('Saved','success')},
+    markHuddle:function(id,status){var m=this.members.find(function(x){return x.id===id});if(!m)return;this.setHval(m,'Huddle Status',status);this.writeMemberCSV();this.renderHuddle()},
     removeFromHuddle:function(id){var m=this.members.find(function(x){return x.id===id});if(!m)return;HUDDLE_COLS.forEach(function(h){App.setHval(m,h,'')});delete this.huddleSelected[id];this.writeMemberCSV();this.renderHuddle()},
     toggleHuddleEditMode:function(){this.huddleEditMode=!this.huddleEditMode;this.renderHuddle()},
     showHuddleAdd:function(){this.huddleEditId=null;document.getElementById('hmTitle').textContent='Add Huddle Member';document.getElementById('hmForm').reset();document.getElementById('hmStatus').value='unused';document.getElementById('hmTimes').value='0';document.getElementById('huddleMemberModal').classList.add('open');this.lockScroll();setTimeout(function(){document.getElementById('hmMemberId').focus()},50)},
@@ -2820,7 +2817,6 @@ var App={
     generateHuddle:function(plan){
         if(!plan){this.showHuddleGenerateModal();return}
         var selected=this.selectHuddleByQuotas(plan.kind,plan.quotas,plan.prefer),pool=this.members.filter(function(m){return App.isInHuddle(m)});
-        this.captureHuddleUndo('Generated pending list',pool);
         pool.forEach(function(m){if(App.huddleStatus(m)==='pending')App.setHval(m,'Huddle Status','unused')});
         selected.forEach(function(m){App.setHval(m,'Huddle Status','pending')});
         this.writeMemberCSV();this.renderHuddle();this.toast('Generated '+selected.length+' pending for huddle','success');
