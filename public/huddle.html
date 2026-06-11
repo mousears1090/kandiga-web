@@ -546,6 +546,7 @@
             <div class="fb-group"><label>Group by</label><select id="huddleGroupBy" onchange="App.renderHuddle()"></select></div>
             <div class="fb-group"><label>Sort by</label><select id="huddleSortBy" onchange="App.renderHuddle()"></select></div>
             <button class="btn btn-p" onclick="App.showHuddleGenerateModal()">Generate</button>
+            <button class="btn" id="huddleUndoBtn" onclick="App.undoHuddlePending()">Undo Pending</button>
             <button class="btn" onclick="App.showHuddleAdd()">+ Add Member</button>
             <button class="btn" id="huddleEditModeBtn" onclick="App.toggleHuddleEditMode()">Edit Mode</button>
             <button class="btn" onclick="App.pickImportType('huddle')">Import Huddle CSV</button>
@@ -2619,6 +2620,7 @@ var App={
             ['In huddle',all.length],['Pending',pending],['Unused',unused],['Used',used],['CMs',Object.keys(cms).length],['Providers',Object.keys(pcps).length]
         ].map(function(x){return '<div class="h-stat"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>'}).join('');
         var editBtn=document.getElementById('huddleEditModeBtn');if(editBtn)editBtn.textContent=this.huddleEditMode?'View Mode':'Edit Mode';
+        var undoBtn=document.getElementById('huddleUndoBtn');if(undoBtn){var u=this.getHuddleUndo();undoBtn.disabled=!u.items.length;undoBtn.textContent=u.items.length?'Undo Pending ('+u.items.length+')':'Undo Pending'}
         var body=document.getElementById('huddleBody'),empty=document.getElementById('huddleEmpty'),table=document.getElementById('huddleTable'),head=document.getElementById('huddleHeadRow'),self=this,customCols=this.customHuddleCols();
         if(head)head.innerHTML='<th class="cell-check"><input type="checkbox" onchange="App.toggleHuddleSelectAll(this.checked)"></th>'
             +'<th>Member ID</th><th>Name</th><th>PCP</th><th>Case Manager</th><th>Tier</th><th>Times</th><th>Last Discussed</th><th>Status</th><th>Huddle Notes</th>'
@@ -2659,8 +2661,16 @@ var App={
     },
     updateHuddleField:function(id,h,v){var m=this.members.find(function(x){return x.id===id});if(!m)return;this.setHval(m,h,v);this.writeMemberCSV();this.renderHuddle();this.toast('Saved','success')},
     updateHuddleIdentity:function(id,key,v){var m=this.members.find(function(x){return x.id===id});if(!m)return;var map={name:'Huddle Name',pcp:'Huddle PCP',cm:'Huddle Case Manager',tier:'Huddle Tier'};this.setHval(m,map[key]||key,v);this.writeMemberCSV();this.render();this.renderHuddle();this.toast('Saved','success')},
-    updateHuddleStatusOnly:function(id,status){var m=this.members.find(function(x){return x.id===id});if(!m)return;this.setHval(m,'Huddle Status',status);this.writeMemberCSV();this.renderHuddle();this.toast('Saved','success')},
-    markHuddle:function(id,status){var m=this.members.find(function(x){return x.id===id});if(!m)return;this.setHval(m,'Huddle Status',status);this.writeMemberCSV();this.renderHuddle()},
+    getHuddleUndo:function(){try{return JSON.parse(localStorage.getItem('mm_huddle_undo')||'{"items":[]}')}catch(e){return{items:[]}}},
+    setHuddleUndo:function(label,items){localStorage.setItem('mm_huddle_undo',JSON.stringify({label:label||'Pending change',items:items||[]}))},
+    captureHuddleUndo:function(label,list){this.setHuddleUndo(label,(list||[]).map(function(m){return{id:m.id,status:App.huddleStatus(m)}}))},
+    undoHuddlePending:function(){
+        var u=this.getHuddleUndo(),n=0;
+        (u.items||[]).forEach(function(it){var m=App.members.find(function(x){return x.id===it.id});if(m){App.setHval(m,'Huddle Status',it.status||'unused');n++}});
+        this.setHuddleUndo('',[]);if(n)this.writeMemberCSV();this.renderHuddle();this.toast(n?'Restored '+n+' huddle statuses':'Nothing to undo',n?'success':'info');
+    },
+    updateHuddleStatusOnly:function(id,status){var m=this.members.find(function(x){return x.id===id});if(!m)return;if(status==='pending'||this.huddleStatus(m)==='pending')this.captureHuddleUndo('Status change',[m]);this.setHval(m,'Huddle Status',status);this.writeMemberCSV();this.renderHuddle();this.toast('Saved','success')},
+    markHuddle:function(id,status){var m=this.members.find(function(x){return x.id===id});if(!m)return;if(status==='pending'||this.huddleStatus(m)==='pending')this.captureHuddleUndo('Pending toggle',[m]);this.setHval(m,'Huddle Status',status);this.writeMemberCSV();this.renderHuddle()},
     removeFromHuddle:function(id){var m=this.members.find(function(x){return x.id===id});if(!m)return;HUDDLE_COLS.forEach(function(h){App.setHval(m,h,'')});delete this.huddleSelected[id];this.writeMemberCSV();this.renderHuddle()},
     toggleHuddleEditMode:function(){this.huddleEditMode=!this.huddleEditMode;this.renderHuddle()},
     showHuddleAdd:function(){this.huddleEditId=null;document.getElementById('hmTitle').textContent='Add Huddle Member';document.getElementById('hmForm').reset();document.getElementById('hmStatus').value='unused';document.getElementById('hmTimes').value='0';document.getElementById('huddleMemberModal').classList.add('open');this.lockScroll();setTimeout(function(){document.getElementById('hmMemberId').focus()},50)},
@@ -2671,7 +2681,7 @@ var App={
     toggleHuddleSelectAll:function(checked){var self=this;if(checked)this.huddleRows().forEach(function(m){self.huddleSelected[m.id]=true});else this.huddleSelected={};this.renderHuddle()},
     clearHuddleSelection:function(){this.huddleSelected={};this.renderHuddle()},
     updateHuddleBulkBar:function(){var n=Object.keys(this.huddleSelected||{}).length,bar=document.getElementById('huddleBulkBar');if(!bar)return;bar.style.display=n?'flex':'none';document.getElementById('huddleBulkCount').textContent=n+' selected'},
-    huddleBulk:function(action){var ids=Object.keys(this.huddleSelected||{}),self=this;ids.forEach(function(id){var m=self.members.find(function(x){return x.id===id});if(!m)return;if(action==='remove'){HUDDLE_COLS.forEach(function(h){self.setHval(m,h,'')});return}self.setHval(m,'Huddle Status',action)});this.huddleSelected={};this.writeMemberCSV();this.renderHuddle();this.toast('Huddle updated','success')},
+    huddleBulk:function(action){var ids=Object.keys(this.huddleSelected||{}),self=this,changed=[];ids.forEach(function(id){var m=self.members.find(function(x){return x.id===id});if(m)changed.push(m)});if(action==='pending'||changed.some(function(m){return App.huddleStatus(m)==='pending'}))this.captureHuddleUndo('Bulk huddle change',changed);changed.forEach(function(m){if(action==='remove'){HUDDLE_COLS.forEach(function(h){self.setHval(m,h,'')});return}self.setHval(m,'Huddle Status',action)});this.huddleSelected={};this.writeMemberCSV();this.renderHuddle();this.toast('Huddle updated','success')},
     huddleGenGroup:function(m,kind){
         if(kind==='provider')return this.pcpOf(m)||'No PCP';
         return this.hCM(m)||'Unassigned CM';
@@ -2806,6 +2816,7 @@ var App={
     generateHuddle:function(plan){
         if(!plan){this.showHuddleGenerateModal();return}
         var selected=this.selectHuddleByQuotas(plan.kind,plan.quotas,plan.prefer),pool=this.members.filter(function(m){return App.isInHuddle(m)});
+        this.captureHuddleUndo('Generated pending list',pool);
         pool.forEach(function(m){if(App.huddleStatus(m)==='pending')App.setHval(m,'Huddle Status','unused')});
         selected.forEach(function(m){App.setHval(m,'Huddle Status','pending')});
         this.writeMemberCSV();this.renderHuddle();this.toast('Generated '+selected.length+' pending for huddle','success');
