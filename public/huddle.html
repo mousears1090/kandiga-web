@@ -2720,6 +2720,12 @@ var App={
             var q=Math.max(0,parseInt(quotas&&quotas[s.name]||0,10)||0);
             max[s.name]=s.max;out[s.name]=Math.min(q,s.max,target);sum+=out[s.name];
         });
+        if(changedName&&out[changedName]!=null){
+            var otherSum=0;
+            stats.forEach(function(s){if(s.name!==changedName)otherSum+=out[s.name]||0});
+            out[changedName]=Math.min(out[changedName],Math.max(0,target-otherSum),max[changedName]);
+            sum=otherSum+out[changedName];
+        }
         if(sum>target){
             stats.slice().reverse().forEach(function(s){
                 if(sum<=target)return;
@@ -2730,18 +2736,6 @@ var App={
             if(sum>target&&changedName&&out[changedName]){
                 var takeChanged=Math.min(out[changedName],sum-target);
                 out[changedName]-=takeChanged;sum-=takeChanged;
-            }
-        }
-        if(sum<target){
-            stats.forEach(function(s){
-                if(sum>=target)return;
-                if(s.name===changedName)return;
-                var add=Math.min(max[s.name]-out[s.name],target-sum);
-                if(add>0){out[s.name]+=add;sum+=add}
-            });
-            if(sum<target&&changedName&&max[changedName]!=null){
-                var addChanged=Math.min(max[changedName]-out[changedName],target-sum);
-                if(addChanged>0){out[changedName]+=addChanged;sum+=addChanged}
             }
         }
         return out;
@@ -2781,10 +2775,10 @@ var App={
         document.getElementById('genProviderPlan').innerHTML=this.renderGenerateTable('provider',pStats,pQuotas,mode==='customProvider');
         document.getElementById('genCmPlan').innerHTML=this.renderGenerateTable('cm',cStats,cQuotas,mode==='customCm');
         var activeKind=(mode==='evenCm'||mode==='customCm')?'cm':'provider',quotas=activeKind==='cm'?cQuotas:pQuotas,stats=activeKind==='cm'?cStats:pStats;
-        var planned=stats.reduce(function(sum,s){return sum+Math.min(parseInt(quotas[s.name]||0,10),s.max)},0);
+        var planned=stats.reduce(function(sum,s){return sum+Math.min(parseInt(quotas[s.name]||0,10),s.max)},0),available=stats.reduce(function(sum,s){return sum+s.max},0),target=Math.min(total,available),remaining=Math.max(0,target-planned);
         document.getElementById('genProviderSummary').textContent=pStats.length+' providers';
         document.getElementById('genCmSummary').textContent=cStats.length+' CMs';
-        document.getElementById('genPreviewText').textContent='This plan will create '+planned+' pending patients using '+(activeKind==='cm'?'CM':'provider')+' counts.';
+        document.getElementById('genPreviewText').textContent='This plan will create '+planned+' pending patients using '+(activeKind==='cm'?'CM':'provider')+' counts.'+(remaining?' Allocate '+remaining+' more to reach the target.':'');
     },
     selectHuddleByQuotas:function(kind,quotas,prefer){
         var pools=this.huddleGeneratePools(prefer),selected=[],seen={},self=this,p={},f={};
@@ -2800,6 +2794,8 @@ var App={
         var s=this.readHuddleGenerateSettings(),kind=(s.mode==='evenCm'||s.mode==='customCm')?'cm':'provider',stats=this.huddleGroupStats(kind,s.prefer),quotas;
         if(s.mode==='evenCm'||s.mode==='evenProvider')quotas=this.evenHuddleQuotas(stats,s.total);
         else quotas=this.normalizeHuddleQuotas(stats,kind==='cm'?s.cmQuotas:s.providerQuotas,s.total);
+        var planned=stats.reduce(function(sum,g){return sum+Math.min(parseInt(quotas[g.name]||0,10),g.max)},0),available=stats.reduce(function(sum,g){return sum+g.max},0),target=Math.min(s.total,available);
+        if((s.mode==='customCm'||s.mode==='customProvider')&&planned<target){this.toast('Allocate '+(target-planned)+' more before generating','danger');this.renderHuddleGeneratePlan(true);return}
         this.saveHuddleGenerateSettings(Object.assign({},s,kind==='cm'?{cmQuotas:quotas}:{providerQuotas:quotas}));
         document.getElementById('huddleCount').value=String(s.total);this.saveHuddleViewSettings();
         this.generateHuddle({kind:kind,quotas:quotas,prefer:s.prefer});
