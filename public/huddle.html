@@ -681,6 +681,8 @@
                 <div class="fi"><label>Rows</label><select id="pdfScope" onchange="App.updateHuddlePDFPreview()"><option value="pending">Pending only</option><option value="active">Pending + unused</option><option value="selected">Selected only</option><option value="filtered">Current filtered view</option><option value="allNotUsed">All non-used huddle patients</option><option value="all">All huddle patients</option></select></div>
                 <div class="fi"><label>Group By</label><select id="pdfGroupBy" onchange="App.updateHuddlePDFPreview()"></select></div>
                 <div class="fi"><label>Sort By</label><select id="pdfSortBy" onchange="App.updateHuddlePDFPreview()"></select></div>
+                <div class="fi"><label>Patients Per Row</label><select id="pdfPatientColumns" onchange="App.updateHuddlePDFPreview()"><option value="1">1 patient</option><option value="2">2 patients</option></select></div>
+                <div class="fi"><label>Fields Per Patient Row</label><select id="pdfFieldColumns" onchange="App.updateHuddlePDFPreview()"><option value="1">1 field</option><option value="2">2 fields</option><option value="3">3 fields</option></select></div>
                 <div class="fi"><label>Card Detail</label><select id="pdfDensity" onchange="App.updateHuddlePDFPreview()"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div>
             </div>
             <div class="pdf-option-box">
@@ -2980,6 +2982,8 @@ var App={
             scope:'pending',
             groupBy:(document.getElementById('huddleGroupBy')||{}).value||'pcp',
             sortBy:(document.getElementById('huddleSortBy')||{}).value||'last',
+            patientColumns:'1',
+            fieldColumns:'2',
             density:'comfortable',
             finalize:true,
             statuses:{pending:true,unused:false,used:false},
@@ -2998,7 +3002,7 @@ var App={
         return Object.assign(def,saved);
     },
     saveHuddlePDFSettings:function(){
-        var s={version:2,title:document.getElementById('pdfTitle').value.trim()||'High-Risk Huddle',subtitle:document.getElementById('pdfSubtitle').value.trim(),fileName:document.getElementById('pdfFileName').value.trim()||'high-risk-huddle.pdf',scope:document.getElementById('pdfScope').value,groupBy:document.getElementById('pdfGroupBy').value,sortBy:document.getElementById('pdfSortBy').value,density:document.getElementById('pdfDensity').value,finalize:document.getElementById('pdfFinalize').checked,statuses:{},fields:{},labels:{}};
+        var s={version:2,title:document.getElementById('pdfTitle').value.trim()||'High-Risk Huddle',subtitle:document.getElementById('pdfSubtitle').value.trim(),fileName:document.getElementById('pdfFileName').value.trim()||'high-risk-huddle.pdf',scope:document.getElementById('pdfScope').value,groupBy:document.getElementById('pdfGroupBy').value,sortBy:document.getElementById('pdfSortBy').value,patientColumns:document.getElementById('pdfPatientColumns').value,fieldColumns:document.getElementById('pdfFieldColumns').value,density:document.getElementById('pdfDensity').value,finalize:document.getElementById('pdfFinalize').checked,statuses:{},fields:{},labels:{}};
         document.querySelectorAll('#pdfStatusFields input').forEach(function(cb){s.statuses[cb.value]=cb.checked});
         document.querySelectorAll('#pdfFieldList input[type=checkbox]').forEach(function(cb){s.fields[cb.value]=cb.checked});
         document.querySelectorAll('#pdfFieldList input[data-label-key]').forEach(function(inp){s.labels[inp.getAttribute('data-label-key')]=inp.value.trim()});
@@ -3026,6 +3030,8 @@ var App={
         document.getElementById('pdfSubtitle').value=s.subtitle||'';
         document.getElementById('pdfFileName').value=s.fileName||'high-risk-huddle.pdf';
         document.getElementById('pdfScope').value=s.scope||'pending';
+        document.getElementById('pdfPatientColumns').value=s.patientColumns||'1';
+        document.getElementById('pdfFieldColumns').value=s.fieldColumns||'2';
         document.getElementById('pdfDensity').value=s.density||'comfortable';
         document.getElementById('pdfFinalize').checked=s.finalize!==false;
         var opts='<option value="pcp">PCP</option><option value="cm">Case Manager</option><option value="status">Status</option><option value="none">No grouping</option>';
@@ -3035,7 +3041,7 @@ var App={
         document.getElementById('pdfStatusFields').innerHTML=['pending','unused','used'].map(function(st){return '<label class="pdf-check"><input type="checkbox" value="'+st+'" '+(s.statuses&&s.statuses[st]?'checked':'')+' onchange="App.updateHuddlePDFPreview()"><span>'+st+'</span></label>'}).join('');
         var fields=[{key:'name',label:'Name'}].concat(this.huddlePDFFieldDefs());
         document.getElementById('pdfFieldList').innerHTML=fields.map(function(f){var label=s.labels&&s.labels[f.key]||f.label;return '<div class="pdf-field-row"><label class="pdf-check"><input type="checkbox" value="'+self.esc(f.key)+'" '+(s.fields&&s.fields[f.key]?'checked':'')+' onchange="App.updateHuddlePDFPreview()"><span>'+self.esc(f.label)+'</span></label><input class="pdf-label-input" data-label-key="'+self.esc(f.key)+'" value="'+self.esc(label)+'" oninput="App.updateHuddlePDFPreview()"></div>'}).join('');
-        ['pdfTitle','pdfSubtitle','pdfFileName','pdfScope','pdfGroupBy','pdfSortBy','pdfDensity','pdfFinalize'].forEach(function(id){document.getElementById(id).oninput=function(){App.updateHuddlePDFPreview()};document.getElementById(id).onchange=function(){App.updateHuddlePDFPreview()}});
+        ['pdfTitle','pdfSubtitle','pdfFileName','pdfScope','pdfGroupBy','pdfSortBy','pdfPatientColumns','pdfFieldColumns','pdfDensity','pdfFinalize'].forEach(function(id){document.getElementById(id).oninput=function(){App.updateHuddlePDFPreview()};document.getElementById(id).onchange=function(){App.updateHuddlePDFPreview()}});
         document.getElementById('huddlePdfModal').classList.add('open');this.lockScroll();this.updateHuddlePDFPreview();
     },
     hideHuddlePDFModal:function(){document.getElementById('huddlePdfModal').classList.remove('open');this.unlockScroll()},
@@ -3108,27 +3114,36 @@ var App={
             doc.setFillColor(tc[0],tc[1],tc[2]);doc.roundedRect(x0,y,contentW,8,2,2,'F');
             doc.setFillColor(c[0],c[1],c[2]);doc.rect(x0,y,2,8,'F');
             doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(17,24,39);doc.text(g+'  ('+groups[g].length+')',x0+5,y+4,{baseline:'middle'});y+=11;
-            var cardW=contentW;
+            var patientCols=Math.max(1,Math.min(2,parseInt(settings.patientColumns||'1',10)||1)),cardGap=4,cardW=patientCols===1?contentW:(contentW-cardGap)/2,cols=[];
+            for(var ci=0;ci<patientCols;ci++)cols.push({x:x0+ci*(cardW+cardGap),y:y});
             groups[g].forEach(function(m){
                 var title=self.hName(m)||'Unnamed',sub=[self.hMemberId(m),self.hCM(m)?'CM: '+self.hCM(m):'',self.pcpOf(m)?'PCP: '+self.pcpOf(m):''].filter(Boolean).join('  |  ');
-                var innerW=cardW-12,fieldGap=4,halfW=(innerW-fieldGap)/2,maxLines=compact?3:6,fieldBlocks=[],fieldRows=[];
+                var innerW=cardW-12,fieldGap=4,fieldCols=Math.max(1,Math.min(3,parseInt(settings.fieldColumns||'2',10)||2)),unitW=(innerW-(fieldCols-1)*fieldGap)/fieldCols,maxLines=compact?3:6,fieldBlocks=[],fieldRows=[];
                 defs.forEach(function(f){
                     if(f.key==='name')return;
                     var v=f.get(m);if(!v)return;
-                    var raw=String(v),halfLines=textLines(raw,halfW,fieldFs).slice(0,maxLines),fullLines=textLines(raw,innerW,fieldFs).slice(0,maxLines);
-                    var span=(f.key==='notes'||raw.length>28||halfLines.length>1)?2:1,lines=span===2?fullLines:halfLines;
+                    var raw=String(v),oneLines=textLines(raw,unitW,fieldFs).slice(0,maxLines),fullLines=textLines(raw,innerW,fieldFs).slice(0,maxLines);
+                    var span=1;
+                    if(f.key==='notes'||raw.length>42||oneLines.length>2)span=fieldCols;
+                    else if(fieldCols===3&&(raw.length>22||oneLines.length>1))span=2;
+                    var fw=span===fieldCols?innerW:(unitW*span+fieldGap*(span-1)),lines=textLines(raw,fw,fieldFs).slice(0,maxLines);
                     fieldBlocks.push({label:f.label,value:raw,span:span,lines:lines,h:lh(labelFs)+Math.max(1,lines.length)*lh(fieldFs)});
                 });
                 fieldBlocks.forEach(function(f){
-                    var last=fieldRows[fieldRows.length-1];
-                    if(f.span===2||!last||last.length===2||last[0].span===2)fieldRows.push([f]);
+                    var last=fieldRows[fieldRows.length-1],used=last?last.reduce(function(sum,x){return sum+x.span},0):0;
+                    if(!last||f.span===fieldCols||used+f.span>fieldCols)fieldRows.push([f]);
                     else last.push(f);
                 });
                 var fieldH=0;fieldRows.forEach(function(r,i){fieldH+=Math.max.apply(null,r.map(function(f){return f.h}));if(i<fieldRows.length-1)fieldH+=rowGap});
                 var subLines=textLines(sub,Math.max(36,cardW-42),8).slice(0,2);
                 var headerH=Math.max(14,5+lh(11)+subLines.length*lh(8));
-                var cardH=Math.max(26,headerH+cardPad+fieldH+cardPad);ensure(cardH+4);
-                var cx=x0,cy=y;
+                var cardH=Math.max(26,headerH+cardPad+fieldH+cardPad),col=cols.slice().sort(function(a,b){return a.y-b.y})[0];
+                if(col.y+cardH>bottom){
+                    var roomy=cols.filter(function(cn){return cn.y+cardH<=bottom}).sort(function(a,b){return a.y-b.y})[0];
+                    if(roomy)col=roomy;
+                    else{doc.addPage();cols.forEach(function(cn){cn.y=mT});col=cols[0]}
+                }
+                var cx=col.x,cy=col.y;
                 doc.setDrawColor(201,209,217);doc.setFillColor(255,255,255);doc.roundedRect(cx,cy,cardW,cardH,2,2,'FD');
                 doc.setFillColor(243,245,248);doc.roundedRect(cx,cy,cardW,headerH,2,2,'F');
                 doc.setFillColor(c[0],c[1],c[2]);doc.roundedRect(cx+4,cy+3,7,7,1.5,1.5,'F');
@@ -3140,16 +3155,18 @@ var App={
                 doc.setFont('helvetica','bold');doc.setFontSize(6.1);doc.setTextColor(bc[0],bc[1],bc[2]);doc.text(badge.toUpperCase(),cx+cardW-15,cy+6,{align:'center',baseline:'middle'});
                 var fx=cx+6,fy=cy+headerH+cardPad;
                 fieldRows.forEach(function(row,ri){
-                    var rowH=Math.max.apply(null,row.map(function(f){return f.h}));
-                    row.forEach(function(f,fi){
-                        var fw=row.length===1&&f.span===2?innerW:halfW,fxi=fx+(fi*(halfW+fieldGap));
+                    var rowH=Math.max.apply(null,row.map(function(f){return f.h})),offset=0;
+                    row.forEach(function(f){
+                        var fw=f.span===fieldCols?innerW:(unitW*f.span+fieldGap*(f.span-1)),fxi=fx+offset*(unitW+fieldGap);
                         doc.setFont('helvetica','bold');doc.setFontSize(labelFs);doc.setTextColor(106,116,128);doc.text(f.label.toUpperCase(),fxi,fy,{baseline:'top'});
                         doc.setFont('helvetica','normal');doc.setFontSize(fieldFs);doc.setTextColor(26,31,38);doc.text(f.lines,fxi,fy+lh(labelFs),{baseline:'top'});
+                        offset+=f.span;
                     });
                     fy+=rowH+(ri<fieldRows.length-1?rowGap:0);
                 });
-                y+=cardH+4;
+                col.y+=cardH+4;
             });
+            y=Math.max.apply(null,cols.map(function(cn){return cn.y}));
             y+=2;
         });
         return doc;
