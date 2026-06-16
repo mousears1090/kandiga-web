@@ -423,6 +423,9 @@
         .prep-shell{display:grid;grid-template-columns:240px minmax(0,1fr);gap:14px;flex:1;min-height:0;overflow:hidden}
         .prep-list{border:1px solid var(--bd);border-radius:var(--r);background:var(--bg-1);overflow:hidden;display:flex;flex-direction:column}
         .prep-list-head{padding:10px 12px;border-bottom:1px solid var(--bd);font-size:11px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:.04em}
+        .prep-filters{display:grid;gap:7px;padding:10px;border-bottom:1px solid var(--bd);background:#fbfcfd}
+        .prep-filters input,.prep-filters select{width:100%;padding:7px 8px;font-family:var(--font);font-size:12px;background:var(--bg-1);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);box-sizing:border-box}
+        .prep-filter-row{display:grid;grid-template-columns:1fr 1fr;gap:7px}
         .prep-patients{overflow-y:auto;min-height:0;flex:1}
         .prep-patient{width:100%;border:0;border-bottom:1px solid #edf0f3;background:transparent;text-align:left;padding:10px 12px;cursor:pointer;color:var(--t2);font-family:var(--font)}
         .prep-patient:hover{background:#f5f8f7}
@@ -740,6 +743,17 @@
             <div class="prep-shell">
                 <div class="prep-list">
                     <div class="prep-list-head" id="prepListHead">Active Patients</div>
+                    <div class="prep-filters">
+                        <input type="search" id="prepPatientSearch" placeholder="Search active patients" oninput="App.renderHuddlePrep()">
+                        <div class="prep-filter-row">
+                            <select id="prepFilterCM" onchange="App.renderHuddlePrep()"><option value="">All CMs</option></select>
+                            <select id="prepFilterProvider" onchange="App.renderHuddlePrep()"><option value="">All Providers</option></select>
+                        </div>
+                        <div class="prep-filter-row">
+                            <select id="prepFilterField" onchange="App.renderHuddlePrep()"><option value="">Any field</option></select>
+                            <input type="search" id="prepFilterValue" placeholder="Field contains..." oninput="App.renderHuddlePrep()">
+                        </div>
+                    </div>
                     <div class="prep-patients" id="prepPatientList"></div>
                 </div>
                 <div class="prep-form" id="prepFormWrap">
@@ -773,6 +787,15 @@
                         </div>
                         <div class="prep-table-wrap"><table class="prep-table"><thead><tr><th>Date</th><th>Type / Provider</th><th>Status</th><th>Notes</th><th></th></tr></thead><tbody id="prepApptRows"></tbody></table></div>
                         <button class="btn btn-sm" style="margin-top:10px" onclick="App.addPrepAppointment()">+ Add Appointment</button>
+                    </div>
+                    <div class="prep-section">
+                        <h3>Admissions</h3>
+                        <div class="prep-table-wrap"><table class="prep-table"><thead><tr><th>Admit Date</th><th>Discharge Date</th><th>Reason</th><th>Notes</th><th></th></tr></thead><tbody id="prepAdmissionRows"></tbody></table></div>
+                        <button class="btn btn-sm" style="margin-top:10px" onclick="App.addPrepAdmission()">+ Add Admission</button>
+                    </div>
+                    <div class="prep-section">
+                        <h3>Assigned Tasks</h3>
+                        <textarea id="prepAssignedTasks" rows="3" oninput="App.updatePrepPreview()" style="width:100%;padding:10px 12px;font-family:var(--font);font-size:14px;background:var(--bg-2);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);resize:vertical"></textarea>
                     </div>
                     <div class="prep-section">
                         <h3>Generated Readout</h3>
@@ -1415,7 +1438,7 @@ var CP={};CALL_TYPES.forEach(function(t,i){CP[t]=i});
 var TIER_ORDER={Gold:0,Silver:1,Bronze:2,Copper:3,Steel:4};
 var HUDDLE_ID_COLS=['Huddle Member ID','Huddle Name','Huddle PCP','Huddle Case Manager','Huddle Tier'];
 var HUDDLE_COLS=['Huddle Status','Times Discussed','Last Discussed','Huddle Notes'];
-var HUDDLE_PREP_COLS=['Prep Age','Prep Sex','Prep Plan','Prep Last HRA Date','Prep HRA Due Date','Prep Primary Provider','Prep Attributed Provider','Prep History','Prep Care Plan','Prep Missed Appointments 12M','Prep Most Recent Appointment','Prep ER Visits 12M','Prep IP Admissions 12M','Prep Most Recent ER/IP','Prep Recent Authorizations','Prep Appointments','Prep Notes'];
+var HUDDLE_PREP_COLS=['Prep Age','Prep Sex','Prep Plan','Prep Last HRA Date','Prep HRA Due Date','Prep Primary Provider','Prep Attributed Provider','Prep History','Prep Care Plan','Prep Missed Appointments 12M','Prep Most Recent Appointment','Prep ER Visits 12M','Prep IP Admissions 12M','Prep Most Recent ER/IP','Prep Recent Authorizations','Prep Appointments','Prep Admissions','Prep Assigned Tasks','Prep Last Readout','Prep Last Prepared Date','Prep Notes'];
 var MEMBER_COL_DEFAULTS=['ID','Member ID','Name','PCP','Case Manager','Tier','Call Type','Next Call','Review During Daily','Daily Review Until','active','hintTitle','hintLabel','hint','noteMemberID','noteTimestamp','note'];
 function normHeader(h){return String(h||'').trim().toLowerCase().replace(/\s+/g,' ')}
 function isHuddleCol(h){var n=normHeader(h);return n.indexOf('prep ')===0||n==='huddle member id'||n==='huddle name'||n==='huddle pcp'||n==='huddle case manager'||n==='huddle tier'||n==='huddle status'||n==='times discussed'||n==='last discussed'||n==='huddle notes'}
@@ -3313,7 +3336,7 @@ var App={
             {col:'Prep History',label:'History / Conditions'},{col:'Prep Care Plan',label:'Plan / Talking Points'},
             {col:'Prep Missed Appointments 12M',label:'Missed Appointments 12M'},{col:'Prep Most Recent Appointment',label:'Most Recent Appointment'},
             {col:'Prep ER Visits 12M',label:'ER Visits 12M'},{col:'Prep IP Admissions 12M',label:'Inpatient Admissions 12M'},
-            {col:'Prep Most Recent ER/IP',label:'Most Recent ER/IP'}
+            {col:'Prep Most Recent ER/IP',label:'Most Recent ER/IP'},{col:'Prep Assigned Tasks',label:'Assigned Tasks'}
         ];
     },
     getHuddlePrepMap:function(){try{return JSON.parse(localStorage.getItem('mm_huddle_prep_map')||'{}')}catch(e){return{}}},
@@ -3391,7 +3414,28 @@ var App={
         this.setHval(m,h,rows.length?JSON.stringify(rows):'');
     },
     prepField:function(id){var el=document.getElementById(id);return el?el.value.trim():''},
+    prepToday:function(){return new Date().toISOString().slice(0,10)},
     prepCurrentMember:function(){return this.huddlePrepRows[this.huddlePrepIndex]},
+    renderPrepFilterOptions:function(){
+        var rows=this.huddlePrepRows||[],cmEl=document.getElementById('prepFilterCM'),provEl=document.getElementById('prepFilterProvider'),fieldEl=document.getElementById('prepFilterField'),self=this;
+        if(!cmEl||!provEl||!fieldEl)return;
+        var cmVal=cmEl.value,provVal=provEl.value,fieldVal=fieldEl.value,cms={},provs={};
+        rows.forEach(function(m){var cm=self.hCM(m),p=self.pcpOf(m)||self.hval(m,'Prep Primary Provider');if(cm)cms[cm]=true;if(p)provs[p]=true});
+        function opts(first,vals,current){return '<option value="">'+first+'</option>'+Object.keys(vals).sort(function(a,b){return a.localeCompare(b)}).map(function(v){return '<option value="'+self.esc(v)+'" '+(v===current?'selected':'')+'>'+self.esc(v)+'</option>'}).join('')}
+        cmEl.innerHTML=opts('All CMs',cms,cmVal);provEl.innerHTML=opts('All Providers',provs,provVal);
+        var sources=this.prepSourceFields().filter(function(f){return f.key});
+        fieldEl.innerHTML='<option value="">Any field</option>'+sources.map(function(f){return '<option value="'+self.esc(f.key)+'" '+(f.key===fieldVal?'selected':'')+'>'+self.esc(f.label)+'</option>'}).join('');
+    },
+    filteredHuddlePrepRows:function(){
+        var rows=this.huddlePrepRows||[],q=this.prepField('prepPatientSearch').toLowerCase(),cm=this.prepField('prepFilterCM'),prov=this.prepField('prepFilterProvider'),field=this.prepField('prepFilterField'),fieldVal=this.prepField('prepFilterValue').toLowerCase(),self=this;
+        return rows.filter(function(m){
+            if(cm&&self.hCM(m)!==cm)return false;
+            if(prov&&(self.pcpOf(m)||self.hval(m,'Prep Primary Provider'))!==prov)return false;
+            if(q){var hay=[self.hName(m),self.hMemberId(m),self.huddleStatus(m),self.hCM(m),self.pcpOf(m),self.hval(m,'Prep Primary Provider'),self.hval(m,'Prep Attributed Provider')].join(' ').toLowerCase();if(hay.indexOf(q)===-1)return false}
+            if(field&&fieldVal&&String(self.prepSourceValue(m,field)||'').toLowerCase().indexOf(fieldVal)===-1)return false;
+            return true;
+        });
+    },
     showHuddlePrepModal:function(){
         var rows=this.huddlePrepSourceRows();if(!rows.length){this.toast('Pick or generate active huddle patients first','danger');return}
         var s=this.getHuddlePrepSettings();
@@ -3399,14 +3443,17 @@ var App={
         document.getElementById('prepPdfFileName').value=s.fileName||'huddle-prep-notes.pdf';
         var mapped=0,self=this;rows.forEach(function(m){if(self.applyPrepMappingsToMember(m,false))mapped++});if(mapped)this.writeMemberCSV();
         this.huddlePrepRows=rows;this.huddlePrepIndex=0;
+        ['prepPatientSearch','prepFilterCM','prepFilterProvider','prepFilterField','prepFilterValue'].forEach(function(id){var el=document.getElementById(id);if(el)el.value=''});
         document.getElementById('huddlePrepModal').classList.add('open');this.lockScroll();this.renderHuddlePrep();
     },
     hideHuddlePrepModal:function(){if(document.getElementById('huddlePrepModal').classList.contains('open'))this.saveCurrentHuddlePrep(true);document.getElementById('huddlePrepModal').classList.remove('open');this.unlockScroll()},
     renderHuddlePrep:function(){
-        var rows=this.huddlePrepRows||[],self=this,m=this.prepCurrentMember();
-        document.getElementById('prepListHead').textContent='Active Patients ('+rows.length+')';
-        document.getElementById('prepPatientList').innerHTML=rows.map(function(p,i){
-            return '<button class="prep-patient '+(i===self.huddlePrepIndex?'active':'')+'" onclick="App.pickPrepPatient('+i+')"><b>'+self.esc(self.hName(p)||'Unnamed')+'</b><span>'+self.esc([self.hMemberId(p),self.huddleStatus(p),self.hCM(p)].filter(Boolean).join(' | '))+'</span></button>';
+        this.renderPrepFilterOptions();
+        var rows=this.huddlePrepRows||[],displayRows=this.filteredHuddlePrepRows(),self=this,m=this.prepCurrentMember();
+        if(displayRows.length&&(!m||displayRows.indexOf(m)===-1)){m=displayRows[0];this.huddlePrepIndex=rows.indexOf(m)}
+        document.getElementById('prepListHead').textContent='Active Patients ('+displayRows.length+' of '+rows.length+')';
+        document.getElementById('prepPatientList').innerHTML=displayRows.map(function(p){
+            return '<button class="prep-patient '+(p===m?'active':'')+'" data-id="'+self.esc(p.id)+'" onclick="App.pickPrepPatientById(this.dataset.id)"><b>'+self.esc(self.hName(p)||'Unnamed')+'</b><span>'+self.esc([self.hMemberId(p),self.huddleStatus(p),self.hCM(p),self.pcpOf(p)].filter(Boolean).join(' | '))+'</span></button>';
         }).join('');
         if(!m){document.getElementById('prepFormWrap').style.display='none';return}
         document.getElementById('prepFormWrap').style.display='';
@@ -3415,21 +3462,24 @@ var App={
             ['prepAge','Prep Age'],['prepSex','Prep Sex'],['prepPlan','Prep Plan'],['prepLastHra','Prep Last HRA Date'],['prepHraDue','Prep HRA Due Date'],
             ['prepPrimaryProvider','Prep Primary Provider'],['prepAttributedProvider','Prep Attributed Provider'],['prepHistory','Prep History'],['prepCarePlan','Prep Care Plan'],
             ['prepMissedAppts','Prep Missed Appointments 12M'],['prepMostRecentAppt','Prep Most Recent Appointment'],['prepErVisits','Prep ER Visits 12M'],
-            ['prepIpAdmissions','Prep IP Admissions 12M'],['prepMostRecentUtil','Prep Most Recent ER/IP']
+            ['prepIpAdmissions','Prep IP Admissions 12M'],['prepMostRecentUtil','Prep Most Recent ER/IP'],['prepAssignedTasks','Prep Assigned Tasks']
         ].forEach(function(pair){var el=document.getElementById(pair[0]);if(el)el.value=self.hval(m,pair[1])||''});
         this.renderPrepAuthRows();
         this.renderPrepAppointmentRows();
+        this.renderPrepAdmissionRows();
         this.updatePrepPreview();
     },
     pickPrepPatient:function(i){this.saveCurrentHuddlePrep(true);this.huddlePrepIndex=i;this.renderHuddlePrep()},
-    prevPrepPatient:function(){if(!this.huddlePrepRows.length)return;this.saveCurrentHuddlePrep(true);this.huddlePrepIndex=Math.max(0,this.huddlePrepIndex-1);this.renderHuddlePrep()},
-    nextPrepPatient:function(){if(!this.huddlePrepRows.length)return;this.saveCurrentHuddlePrep(true);this.huddlePrepIndex=Math.min(this.huddlePrepRows.length-1,this.huddlePrepIndex+1);this.renderHuddlePrep()},
+    pickPrepPatientById:function(id){var i=(this.huddlePrepRows||[]).findIndex(function(m){return m.id===id});if(i>-1)this.pickPrepPatient(i)},
+    prevPrepPatient:function(){if(!this.huddlePrepRows.length)return;this.saveCurrentHuddlePrep(true);var rows=this.filteredHuddlePrepRows(),m=this.prepCurrentMember(),i=Math.max(0,rows.indexOf(m)-1);if(rows[i])this.huddlePrepIndex=this.huddlePrepRows.indexOf(rows[i]);this.renderHuddlePrep()},
+    nextPrepPatient:function(){if(!this.huddlePrepRows.length)return;this.saveCurrentHuddlePrep(true);var rows=this.filteredHuddlePrepRows(),m=this.prepCurrentMember(),i=rows.indexOf(m);i=i<0?0:Math.min(rows.length-1,i+1);if(rows[i])this.huddlePrepIndex=this.huddlePrepRows.indexOf(rows[i]);this.renderHuddlePrep()},
     readPrepRows:function(type){
-        var tbody=document.getElementById(type==='auth'?'prepAuthRows':'prepApptRows'),rows=[];
+        var tbody=document.getElementById(type==='auth'?'prepAuthRows':type==='admit'?'prepAdmissionRows':'prepApptRows'),rows=[];
         if(!tbody)return rows;
         tbody.querySelectorAll('tr').forEach(function(tr){
             var inputs=tr.querySelectorAll('input,select');
             if(type==='auth')rows.push({what:inputs[0].value.trim(),status:inputs[1].value.trim(),date:inputs[2].value.trim(),notes:inputs[3].value.trim()});
+            else if(type==='admit')rows.push({admit:inputs[0].value.trim(),discharge:inputs[1].value.trim(),reason:inputs[2].value.trim(),notes:inputs[3].value.trim()});
             else rows.push({date:inputs[0].value.trim(),type:inputs[1].value.trim(),status:inputs[2].value.trim(),notes:inputs[3].value.trim()});
         });
         return rows;
@@ -3440,10 +3490,13 @@ var App={
             ['Prep Age','prepAge'],['Prep Sex','prepSex'],['Prep Plan','prepPlan'],['Prep Last HRA Date','prepLastHra'],['Prep HRA Due Date','prepHraDue'],
             ['Prep Primary Provider','prepPrimaryProvider'],['Prep Attributed Provider','prepAttributedProvider'],['Prep History','prepHistory'],['Prep Care Plan','prepCarePlan'],
             ['Prep Missed Appointments 12M','prepMissedAppts'],['Prep Most Recent Appointment','prepMostRecentAppt'],['Prep ER Visits 12M','prepErVisits'],
-            ['Prep IP Admissions 12M','prepIpAdmissions'],['Prep Most Recent ER/IP','prepMostRecentUtil']
+            ['Prep IP Admissions 12M','prepIpAdmissions'],['Prep Most Recent ER/IP','prepMostRecentUtil'],['Prep Assigned Tasks','prepAssignedTasks']
         ].forEach(function(pair){App.setHval(m,pair[0],App.prepField(pair[1]))});
         this.prepSetJson(m,'Prep Recent Authorizations',this.readPrepRows('auth'));
         this.prepSetJson(m,'Prep Appointments',this.readPrepRows('appt'));
+        this.prepSetJson(m,'Prep Admissions',this.readPrepRows('admit'));
+        this.setHval(m,'Prep Last Readout',this.buildPrepNarrative(this.prepFormData(m)));
+        this.setHval(m,'Prep Last Prepared Date',this.prepToday());
         this.saveHuddlePrepSettings();this.writeMemberCSV();this.renderHuddle();if(!silent)this.toast('Prep saved','success');
     },
     renderPrepAuthRows:function(rows){
@@ -3458,10 +3511,18 @@ var App={
             return '<tr><td><input type="date" value="'+self.esc(r.date||'')+'" oninput="App.updatePrepPreview()"></td><td><input value="'+self.esc(r.type||'')+'" oninput="App.updatePrepPreview()"></td><td><select onchange="App.updatePrepPreview()"><option value=""></option><option '+((r.status||'')==='Completed'?'selected':'')+'>Completed</option><option '+((r.status||'')==='Missed'?'selected':'')+'>Missed</option><option '+((r.status||'')==='Scheduled'?'selected':'')+'>Scheduled</option></select></td><td><input value="'+self.esc(r.notes||'')+'" oninput="App.updatePrepPreview()"></td><td class="prep-row-actions"><button class="btn btn-sm btn-d" onclick="App.removePrepAppointment('+i+')">&times;</button></td></tr>';
         }).join('');
     },
+    renderPrepAdmissionRows:function(rows){
+        rows=rows||this.prepJson(this.prepCurrentMember(),'Prep Admissions');var self=this;
+        document.getElementById('prepAdmissionRows').innerHTML=(rows.length?rows:[{}]).map(function(r,i){
+            return '<tr><td><input type="date" value="'+self.esc(r.admit||'')+'" oninput="App.updatePrepPreview()"></td><td><input type="date" value="'+self.esc(r.discharge||'')+'" oninput="App.updatePrepPreview()"></td><td><input value="'+self.esc(r.reason||'')+'" oninput="App.updatePrepPreview()"></td><td><input value="'+self.esc(r.notes||'')+'" oninput="App.updatePrepPreview()"></td><td class="prep-row-actions"><button class="btn btn-sm btn-d" onclick="App.removePrepAdmission('+i+')">&times;</button></td></tr>';
+        }).join('');
+    },
     addPrepAuth:function(){var m=this.prepCurrentMember();if(!m)return;var rows=this.readPrepRows('auth');rows.push({});this.renderPrepAuthRows(rows);this.updatePrepPreview()},
     removePrepAuth:function(i){var m=this.prepCurrentMember();if(!m)return;var rows=this.readPrepRows('auth');rows.splice(i,1);this.renderPrepAuthRows(rows);this.updatePrepPreview()},
     addPrepAppointment:function(){var m=this.prepCurrentMember();if(!m)return;var rows=this.readPrepRows('appt');rows.push({});this.renderPrepAppointmentRows(rows);this.updatePrepPreview()},
     removePrepAppointment:function(i){var m=this.prepCurrentMember();if(!m)return;var rows=this.readPrepRows('appt');rows.splice(i,1);this.renderPrepAppointmentRows(rows);this.updatePrepPreview()},
+    addPrepAdmission:function(){var m=this.prepCurrentMember();if(!m)return;var rows=this.readPrepRows('admit');rows.push({});this.renderPrepAdmissionRows(rows);this.updatePrepPreview()},
+    removePrepAdmission:function(i){var m=this.prepCurrentMember();if(!m)return;var rows=this.readPrepRows('admit');rows.splice(i,1);this.renderPrepAdmissionRows(rows);this.updatePrepPreview()},
     prepFormData:function(m){
         return {
             name:this.hName(m)||'the member',id:this.hMemberId(m),sex:this.prepField('prepSex')||this.hval(m,'Prep Sex'),age:this.prepAgeFromDOB(this.prepField('prepAge')||this.hval(m,'Prep Age')),plan:this.prepField('prepPlan')||this.hval(m,'Prep Plan'),
@@ -3470,41 +3531,70 @@ var App={
             history:this.prepField('prepHistory')||this.hval(m,'Prep History'),carePlan:this.prepField('prepCarePlan')||this.hval(m,'Prep Care Plan')||this.hval(m,'Huddle Notes'),
             missed:this.prepField('prepMissedAppts')||this.hval(m,'Prep Missed Appointments 12M'),recentAppt:this.prepField('prepMostRecentAppt')||this.hval(m,'Prep Most Recent Appointment'),
             er:this.prepField('prepErVisits')||this.hval(m,'Prep ER Visits 12M'),ip:this.prepField('prepIpAdmissions')||this.hval(m,'Prep IP Admissions 12M'),recentUtil:this.prepField('prepMostRecentUtil')||this.hval(m,'Prep Most Recent ER/IP'),
+            tasks:this.prepField('prepAssignedTasks')||this.hval(m,'Prep Assigned Tasks'),
             auths:this.readPrepRows('auth').filter(function(r){return Object.keys(r).some(function(k){return String(r[k]||'').trim()})}),
-            appts:this.readPrepRows('appt').filter(function(r){return Object.keys(r).some(function(k){return String(r[k]||'').trim()})})
+            appts:this.readPrepRows('appt').filter(function(r){return Object.keys(r).some(function(k){return String(r[k]||'').trim()})}),
+            admissions:this.readPrepRows('admit').filter(function(r){return Object.keys(r).some(function(k){return String(r[k]||'').trim()})})
         };
     },
     prepSavedData:function(m){
-        return {name:this.hName(m)||'the member',id:this.hMemberId(m),sex:this.hval(m,'Prep Sex'),age:this.prepAgeFromDOB(this.hval(m,'Prep Age')),plan:this.hval(m,'Prep Plan'),lastHra:this.hval(m,'Prep Last HRA Date'),hraDue:this.hval(m,'Prep HRA Due Date'),primary:this.hval(m,'Prep Primary Provider')||this.pcpOf(m),attributed:this.hval(m,'Prep Attributed Provider'),history:this.hval(m,'Prep History'),carePlan:this.hval(m,'Prep Care Plan')||this.hval(m,'Huddle Notes'),missed:this.hval(m,'Prep Missed Appointments 12M'),recentAppt:this.hval(m,'Prep Most Recent Appointment'),er:this.hval(m,'Prep ER Visits 12M'),ip:this.hval(m,'Prep IP Admissions 12M'),recentUtil:this.hval(m,'Prep Most Recent ER/IP'),auths:this.prepJson(m,'Prep Recent Authorizations'),appts:this.prepJson(m,'Prep Appointments')};
+        return {name:this.hName(m)||'the member',id:this.hMemberId(m),sex:this.hval(m,'Prep Sex'),age:this.prepAgeFromDOB(this.hval(m,'Prep Age')),plan:this.hval(m,'Prep Plan'),lastHra:this.hval(m,'Prep Last HRA Date'),hraDue:this.hval(m,'Prep HRA Due Date'),primary:this.hval(m,'Prep Primary Provider')||this.pcpOf(m),attributed:this.hval(m,'Prep Attributed Provider'),history:this.hval(m,'Prep History'),carePlan:this.hval(m,'Prep Care Plan')||this.hval(m,'Huddle Notes'),missed:this.hval(m,'Prep Missed Appointments 12M'),recentAppt:this.hval(m,'Prep Most Recent Appointment'),er:this.hval(m,'Prep ER Visits 12M'),ip:this.hval(m,'Prep IP Admissions 12M'),recentUtil:this.hval(m,'Prep Most Recent ER/IP'),tasks:this.hval(m,'Prep Assigned Tasks'),lastReadout:this.hval(m,'Prep Last Readout'),lastPrepared:this.hval(m,'Prep Last Prepared Date'),auths:this.prepJson(m,'Prep Recent Authorizations'),appts:this.prepJson(m,'Prep Appointments'),admissions:this.prepJson(m,'Prep Admissions')};
     },
     prepSubject:function(d){
         var name=d.name||'The member',last=name.indexOf(',')>-1?name.split(',')[0].trim():name.trim().split(/\s+/).slice(-1)[0],sex=(d.sex||'').toLowerCase();
         if(sex==='male')return 'Mr. '+last;if(sex==='female')return 'Ms. '+last;return name;
     },
     buildPrepNarrative:function(d){
-        var subj=this.prepSubject(d),sex=(d.sex||'member').toLowerCase(),bits=[];
-        var intro=subj+' is '+(d.age?('a '+d.age+'-year-old '+sex):(d.sex?'a '+sex:'being reviewed for huddle prep'));
+        var subj=this.prepSubject(d),sex=(d.sex||'').toLowerCase(),bits=[],patient=(sex==='male'?'he':sex==='female'?'she':'the patient');
+        function plural(n,s,p){return String(n)==='1'?s:(p||s+'s')}
+        function cleanList(rows,keys){return (rows||[]).filter(function(r){return keys.some(function(k){return String((r||{})[k]||'').trim()})})}
+        var intro=subj+' is ';
+        if(d.age&&d.sex)intro+='a '+d.age+'-year-old '+sex;
+        else if(d.age)intro+='a '+d.age+'-year-old patient';
+        else if(d.sex)intro+='a '+sex+' patient';
+        else intro+='a high-risk member';
         if(d.plan)intro+=' enrolled in '+d.plan;
         bits.push(intro+'.');
-        if(d.history)bits.push('History is notable for '+d.history+'.');
-        var hra=[];if(d.lastHra)hra.push('last HRA completed '+d.lastHra);if(d.hraDue)hra.push('HRA due '+d.hraDue);if(hra.length)bits.push('HRA status: '+hra.join('; ')+'.');
-        var prov=[];if(d.primary)prov.push('primary provider '+d.primary);if(d.attributed)prov.push('attributed provider '+d.attributed);if(prov.length)bits.push('Provider alignment: '+prov.join('; ')+'.');
-        if(d.auths&&d.auths.length)bits.push('Recent authorizations include '+d.auths.map(function(a){return [a.what,a.status,a.date].filter(Boolean).join(' - ')}).join('; ')+'.');
-        var util=[];if(d.missed)util.push(d.missed+' missed appointments in the past 12 months');if(d.recentAppt)util.push('most recent appointment '+d.recentAppt);if(d.er)util.push(d.er+' ER visits in the past 12 months');if(d.ip)util.push(d.ip+' inpatient admissions in the past 12 months');if(d.recentUtil)util.push('most recent ER/IP '+d.recentUtil);if(util.length)bits.push('Utilization review: '+util.join('; ')+'.');
-        if(d.appts&&d.appts.length)bits.push('Appointment detail: '+d.appts.map(function(a){return [a.date,a.type,a.status,a.notes].filter(Boolean).join(' - ')}).join('; ')+'.');
-        if(d.carePlan)bits.push('Discussion plan: '+d.carePlan);
+        if(d.primary&&d.attributed)bits.push((patient==='the patient'?'The patient':patient.charAt(0).toUpperCase()+patient.slice(1))+' is followed by PCP '+d.primary+' and attributed to '+d.attributed+'.');
+        else if(d.primary)bits.push((patient==='the patient'?'The patient':patient.charAt(0).toUpperCase()+patient.slice(1))+' is followed by PCP '+d.primary+'.');
+        else if(d.attributed)bits.push((patient==='the patient'?'The patient':patient.charAt(0).toUpperCase()+patient.slice(1))+' is attributed to '+d.attributed+'.');
+        if(d.history)bits.push('History includes '+d.history+'.');
+        if(d.lastHra&&d.hraDue)bits.push('The last HRA was completed on '+d.lastHra+', and the next HRA is due on '+d.hraDue+'.');
+        else if(d.lastHra)bits.push('The last HRA was completed on '+d.lastHra+'.');
+        else if(d.hraDue)bits.push('The next HRA is due on '+d.hraDue+'.');
+        var util=[];
+        if(d.missed)util.push(d.missed+' missed '+plural(d.missed,'appointment')+' in the past 12 months');
+        if(d.recentAppt)util.push('the most recent kept appointment was '+d.recentAppt);
+        if(util.length)bits.push('The patient has had '+util.join(', and ')+'.');
+        var acute=[];
+        if(d.er)acute.push(d.er+' ER '+plural(d.er,'visit'));
+        if(d.ip)acute.push(d.ip+' inpatient '+plural(d.ip,'admission'));
+        if(acute.length){var s='The patient has had '+acute.join(' and ')+' in the past 12 months';if(d.recentUtil)s+=', with the most recent ER or inpatient encounter on '+d.recentUtil;bits.push(s+'.')}
+        var admits=cleanList(d.admissions,['admit','discharge','reason','notes']);
+        if(admits.length)bits.push('Admission history includes '+admits.map(function(a){var s=[];if(a.admit)s.push('admitted '+a.admit);if(a.discharge)s.push('discharged '+a.discharge);if(a.reason)s.push('for '+a.reason);if(a.notes)s.push(a.notes);return s.join(', ')}).join('; ')+'.');
+        var auths=cleanList(d.auths,['what','status','date','notes']);
+        if(auths.length)bits.push('Recent authorizations include '+auths.map(function(a){return [a.what,a.status,a.date,a.notes].filter(Boolean).join(', ')}).join('; ')+'.');
+        var appts=cleanList(d.appts,['date','type','status','notes']);
+        if(appts.length)bits.push('Appointment details include '+appts.map(function(a){return [a.date,a.type,a.status,a.notes].filter(Boolean).join(', ')}).join('; ')+'.');
+        if(d.carePlan)bits.push('For today\'s huddle, review '+d.carePlan+'.');
+        if(d.tasks)bits.push('Assigned tasks: '+d.tasks+'.');
         return bits.join(' ');
     },
     updatePrepPreview:function(){
         var m=this.prepCurrentMember();if(!m)return;
         document.getElementById('prepNarrative').textContent=this.buildPrepNarrative(this.prepFormData(m));
     },
+    stampPrepReadouts:function(rows){
+        var self=this,today=this.prepToday();
+        (rows||[]).forEach(function(m){self.setHval(m,'Prep Last Readout',self.buildPrepNarrative(self.prepSavedData(m)));self.setHval(m,'Prep Last Prepared Date',today)});
+        this.writeMemberCSV();
+    },
     downloadHuddlePrepPDF:function(){
         this.saveCurrentHuddlePrep(true);
         var rows=this.huddlePrepRows||[];if(!rows.length){this.toast('No prep patients selected','danger');return}
         if(!window.jspdf){this.toast('PDF engine is not loaded','danger');return}
         var settings=this.saveHuddlePrepSettings(),btn=document.getElementById('prepDownloadBtn'),old=btn.textContent;btn.disabled=true;btn.textContent='Generating...';
-        try{var doc=this.buildHuddlePrepPDFDoc(rows,settings);doc.save(this.pdfSafeName(settings.fileName));this.toast('Downloaded prep PDF','success')}
+        try{this.stampPrepReadouts(rows);var doc=this.buildHuddlePrepPDFDoc(rows,settings);doc.save(this.pdfSafeName(settings.fileName));this.toast('Downloaded prep PDF','success')}
         catch(e){this.toast('Could not generate prep PDF: '+e.message,'danger')}
         btn.disabled=false;btn.textContent=old;
     },
@@ -3530,6 +3620,8 @@ var App={
                 ['Utilization',[d.er?d.er+' ER':'',d.ip?d.ip+' IP':'',d.missed?d.missed+' missed appts':''].filter(Boolean).join(' | ')]
             ].filter(function(item){return String(item[1]||'').trim()});
             var cleanAuths=(d.auths||[]).filter(function(a){return Object.keys(a||{}).some(function(k){return String(a[k]||'').trim()})});
+            var cleanAdmissions=(d.admissions||[]).filter(function(a){return Object.keys(a||{}).some(function(k){return String(a[k]||'').trim()})});
+            var cleanAppts=(d.appts||[]).filter(function(a){return Object.keys(a||{}).some(function(k){return String(a[k]||'').trim()})});
             var narrLines=lines(narr,w-10,9.4),summaryRows=Math.ceil(summaryFields.length/3),cardH=24+summaryRows*12+narrLines.length*lh(9.4)+12;
             ensure(Math.min(cardH,90));
             doc.setDrawColor(203,213,225);doc.setFillColor(255,255,255);doc.roundedRect(x,y,w,Math.min(cardH,bottom-y),2,2,'FD');
@@ -3545,7 +3637,10 @@ var App={
             var remaining=bottom-fy-8;
             if(narrLines.length*lh(9.4)>remaining){doc.text(narrLines.slice(0,Math.max(1,Math.floor(remaining/lh(9.4)))),x+5,fy,{baseline:'top'});doc.addPage();y=mT;doc.text(narrLines.slice(Math.max(1,Math.floor(remaining/lh(9.4)))),x,y,{baseline:'top'});y+=narrLines.slice(Math.max(1,Math.floor(remaining/lh(9.4)))).length*lh(9.4)+8}
             else{doc.text(narrLines,x+5,fy,{baseline:'top'});y=fy+narrLines.length*lh(9.4)+8}
+            if(d.tasks){ensure(16);doc.setFont('helvetica','bold');doc.setFontSize(7.2);doc.setTextColor(100,116,139);doc.text('ASSIGNED TASKS',x+5,y,{baseline:'top'});y+=lh(7.2);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(17,24,39);var taskLines=lines(d.tasks,w-10,8.5);doc.text(taskLines,x+5,y,{baseline:'top'});y+=taskLines.length*lh(8.5)+4}
+            if(cleanAdmissions.length){ensure(18);doc.setFont('helvetica','bold');doc.setFontSize(7.2);doc.setTextColor(100,116,139);doc.text('ADMISSIONS',x+5,y,{baseline:'top'});y+=lh(7.2);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(17,24,39);var admitText=cleanAdmissions.map(function(a){return '- '+[a.admit?('Admit '+a.admit):'',a.discharge?('Discharge '+a.discharge):'',a.reason,a.notes].filter(Boolean).join(' | ')}).join('\\n'),admitLines=lines(admitText,w-10,8.5);doc.text(admitLines,x+5,y,{baseline:'top'});y+=admitLines.length*lh(8.5)+4}
             if(cleanAuths.length){ensure(18);doc.setFont('helvetica','bold');doc.setFontSize(7.2);doc.setTextColor(100,116,139);doc.text('RECENT AUTHORIZATIONS',x+5,y,{baseline:'top'});y+=lh(7.2);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(17,24,39);var authText=cleanAuths.map(function(a){return '- '+[a.what,a.status,a.date,a.notes].filter(Boolean).join(' | ')}).join('\\n'),authLines=lines(authText,w-10,8.5);doc.text(authLines,x+5,y,{baseline:'top'});y+=authLines.length*lh(8.5)+4}
+            if(cleanAppts.length){ensure(18);doc.setFont('helvetica','bold');doc.setFontSize(7.2);doc.setTextColor(100,116,139);doc.text('APPOINTMENT DETAILS',x+5,y,{baseline:'top'});y+=lh(7.2);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(17,24,39);var apptText=cleanAppts.map(function(a){return '- '+[a.date,a.type,a.status,a.notes].filter(Boolean).join(' | ')}).join('\\n'),apptLines=lines(apptText,w-10,8.5);doc.text(apptLines,x+5,y,{baseline:'top'});y+=apptLines.length*lh(8.5)+4}
             y+=4;
         });
         return doc;
