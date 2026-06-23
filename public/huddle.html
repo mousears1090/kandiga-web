@@ -426,6 +426,10 @@
         .prep-filters{display:grid;gap:7px;padding:10px;border-bottom:1px solid var(--bd);background:#fbfcfd}
         .prep-filters input,.prep-filters select{width:100%;padding:7px 8px;font-family:var(--font);font-size:12px;background:var(--bg-1);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);box-sizing:border-box}
         .prep-filter-row{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+        .prep-quick-list{display:grid;gap:8px}
+        .prep-quick-row{display:grid;grid-template-columns:minmax(160px,220px) minmax(0,1fr) auto;gap:8px;align-items:center}
+        .prep-quick-row select,.prep-quick-row input{width:100%;padding:8px 10px;font-family:var(--font);font-size:13px;background:var(--bg-2);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);box-sizing:border-box}
+        .prep-quick-help{font-size:12px;color:var(--t3);line-height:1.4;margin-top:8px}
         .prep-patients{overflow-y:auto;min-height:0;flex:1}
         .prep-patient{width:100%;border:0;border-bottom:1px solid #edf0f3;background:transparent;text-align:left;padding:10px 12px;cursor:pointer;color:var(--t2);font-family:var(--font)}
         .prep-patient:hover{background:#f5f8f7}
@@ -744,18 +748,14 @@
                 <h3>Output Style</h3>
                 <div class="fg" style="margin-bottom:10px">
                     <div class="fi"><label>Prep Output</label><select id="prepOutputStyle" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"><option value="script">Script Readout</option><option value="quick">Quick List</option></select></div>
-                    <div class="fi"><label>Header Field 1</label><select id="prepHeaderField1" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
-                    <div class="fi"><label>Header Field 2</label><select id="prepHeaderField2" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
-                    <div class="fi"><label>Header Field 3</label><select id="prepHeaderField3" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
                 </div>
-                <div class="fg" id="prepQuickLineFields">
-                    <div class="fi"><label>Quick Line 1</label><select id="prepQuickLine1" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
-                    <div class="fi"><label>Quick Line 2</label><select id="prepQuickLine2" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
-                    <div class="fi"><label>Quick Line 3</label><select id="prepQuickLine3" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
-                    <div class="fi"><label>Quick Line 4</label><select id="prepQuickLine4" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
-                    <div class="fi"><label>Quick Line 5</label><select id="prepQuickLine5" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
-                    <div class="fi"><label>Quick Line 6</label><select id="prepQuickLine6" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
-                </div>
+                <h3>Card Header Fields</h3>
+                <div class="prep-quick-list" id="prepHeaderFields" style="margin-bottom:10px"></div>
+                <button class="btn btn-sm" style="margin-bottom:12px" onclick="App.addPrepHeaderField()">+ Add Header Field</button>
+                <h3>Quick List Lines</h3>
+                <div class="prep-quick-list" id="prepQuickLineFields"></div>
+                <button class="btn btn-sm" style="margin-top:10px" onclick="App.addPrepQuickLine()">+ Add Quick Line</button>
+                <div class="prep-quick-help">Custom template examples: {Age} year old {Sex}, Followed by {Primary Provider}, CM: {Case Manager}. You can also use any imported column name inside braces.</div>
             </div>
             <div class="prep-shell">
                 <div class="prep-list">
@@ -3342,10 +3342,15 @@ var App={
     huddlePrepRows:[],huddlePrepIndex:0,
     getHuddlePrepSettings:function(){try{return JSON.parse(localStorage.getItem('mm_huddle_prep')||'{}')}catch(e){return{}}},
     saveHuddlePrepSettings:function(){
+        var headerRows=[].slice.call(document.querySelectorAll('#prepHeaderFields .prep-header-row select')).map(function(sel){return sel.value}).filter(Boolean);
+        var quickRows=[].slice.call(document.querySelectorAll('#prepQuickLineFields .prep-quick-row')).map(function(row){
+            var sel=row.querySelector('select'),inp=row.querySelector('input');
+            return {kind:sel?sel.value:'',text:inp?inp.value.trim():''};
+        }).filter(function(r){return r.kind||r.text});
         var s={title:(document.getElementById('prepPdfTitle')||{}).value||'Huddle Prep Notes',fileName:(document.getElementById('prepPdfFileName')||{}).value||'huddle-prep-notes.pdf',
             outputStyle:(document.getElementById('prepOutputStyle')||{}).value||'script',
-            headerFields:[1,2,3].map(function(i){var el=document.getElementById('prepHeaderField'+i);return el?el.value:''}),
-            quickLines:[1,2,3,4,5,6].map(function(i){var el=document.getElementById('prepQuickLine'+i);return el?el.value:''})};
+            headerFields:headerRows,
+            quickLines:quickRows};
         localStorage.setItem('mm_huddle_prep',JSON.stringify(s));return s;
     },
     prepMapTargets:function(){
@@ -3384,10 +3389,10 @@ var App={
         if(key.indexOf('huddle:')===0)return this.hval(m,key.slice(7));
         return'';
     },
-    prepQuickDefaults:function(){return {headerFields:['member.name','member.memberId','member.cm'],quickLines:['ageSex','providerSentence','history','hraSentence','utilization','tasks']}},
+    prepQuickDefaults:function(){return {headerFields:['member.name','member.memberId','member.cm'],quickLines:[{kind:'ageSex',text:''},{kind:'providerSentence',text:''},{kind:'history',text:''},{kind:'hraSentence',text:''},{kind:'utilization',text:''},{kind:'tasks',text:''}]}},
     prepQuickFieldOptions:function(){
         var base=[
-            {key:'',label:'-- Skip --'},{key:'ageSex',label:'Age / Sex line'},{key:'providerSentence',label:'Followed / attributed provider sentence'},
+            {key:'',label:'-- Skip --'},{key:'custom',label:'Custom template'},{key:'ageSex',label:'Age / Sex line'},{key:'providerSentence',label:'Followed / attributed provider sentence'},
             {key:'history',label:'History / Conditions'},{key:'hraSentence',label:'HRA sentence'},{key:'utilization',label:'Utilization sentence'},
             {key:'recentAuths',label:'Recent authorizations'},{key:'admissions',label:'Admissions'},{key:'appointments',label:'Appointment details'},
             {key:'carePlan',label:'Plan / Talking Points'},{key:'tasks',label:'Assigned Tasks'}
@@ -3396,16 +3401,43 @@ var App={
         this.prepSourceFields().forEach(function(o){if(o.key&&!seen['source:'+o.key])base.push({key:'source:'+o.key,label:'Column: '+o.label})});
         return base;
     },
+    normalizePrepQuickLines:function(lines){
+        var defs=this.prepQuickDefaults().quickLines;
+        if(!Array.isArray(lines))return defs.slice();
+        return lines.map(function(line){
+            if(typeof line==='string')return {kind:line,text:''};
+            return {kind:line.kind||'',text:line.text||''};
+        });
+    },
+    normalizePrepHeaderFields:function(fields){
+        var defs=this.prepQuickDefaults().headerFields;
+        return Array.isArray(fields)?fields.slice():defs.slice();
+    },
     prepPopulateOutputOptions:function(settings){
         settings=settings||this.getHuddlePrepSettings();var defs=this.prepQuickDefaults(),self=this;
         var style=document.getElementById('prepOutputStyle');if(style)style.value=settings.outputStyle||'script';
-        var sourceOpts=this.prepSourceFields().map(function(o){return '<option value="'+self.esc(o.key)+'">'+self.esc(o.label)+'</option>'}).join('');
-        [1,2,3].forEach(function(i){var el=document.getElementById('prepHeaderField'+i),val=(settings.headerFields&&settings.headerFields[i-1])||defs.headerFields[i-1]||'';if(el){el.innerHTML=sourceOpts;el.value=val}});
-        var quickOpts=this.prepQuickFieldOptions().map(function(o){return '<option value="'+self.esc(o.key)+'">'+self.esc(o.label)+'</option>'}).join('');
-        var lines=(settings.quickLines&&settings.quickLines.length?settings.quickLines:defs.quickLines);
-        document.getElementById('prepQuickLineFields').innerHTML=[1,2,3,4,5,6].map(function(i){var val=lines[i-1]||'';return '<div class="fi"><label>Quick Line '+i+'</label><select id="prepQuickLine'+i+'" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()">'+quickOpts+'</select></div>'}).join('');
-        [1,2,3,4,5,6].forEach(function(i){var el=document.getElementById('prepQuickLine'+i);if(el)el.value=lines[i-1]||''});
+        this.renderPrepHeaderRows(this.normalizePrepHeaderFields(Object.prototype.hasOwnProperty.call(settings,'headerFields')?settings.headerFields:defs.headerFields));
+        this.renderPrepQuickLineRows(this.normalizePrepQuickLines(Object.prototype.hasOwnProperty.call(settings,'quickLines')?settings.quickLines:defs.quickLines));
     },
+    renderPrepHeaderRows:function(fields){
+        var self=this,sourceOpts=this.prepSourceFields().map(function(o){return '<option value="'+self.esc(o.key)+'">'+self.esc(o.label)+'</option>'}).join(''),wrap=document.getElementById('prepHeaderFields'),rows=this.normalizePrepHeaderFields(fields);
+        if(!wrap)return;
+        wrap.innerHTML=rows.map(function(field,i){return '<div class="prep-quick-row prep-header-row" data-i="'+i+'"><select onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()">'+sourceOpts+'</select><input type="text" value="" placeholder="Header value comes from selected field" disabled><button class="btn btn-sm btn-d" onclick="App.removePrepHeaderField('+i+')">&times;</button></div>'}).join('');
+        rows.forEach(function(field,i){var sel=wrap.querySelector('.prep-header-row[data-i="'+i+'"] select');if(sel)sel.value=field||''});
+    },
+    addPrepHeaderField:function(){var rows=this.saveHuddlePrepSettings().headerFields||[];rows.push('');this.renderPrepHeaderRows(rows);this.saveHuddlePrepSettings();this.updatePrepPreview()},
+    removePrepHeaderField:function(i){var rows=this.saveHuddlePrepSettings().headerFields||[];rows.splice(i,1);this.renderPrepHeaderRows(rows);this.saveHuddlePrepSettings();this.updatePrepPreview()},
+    renderPrepQuickLineRows:function(lines){
+        var quickOpts=this.prepQuickFieldOptions().map(function(o){return '<option value="'+App.esc(o.key)+'">'+App.esc(o.label)+'</option>'}).join('');
+        var rows=this.normalizePrepQuickLines(lines),wrap=document.getElementById('prepQuickLineFields');
+        if(!wrap)return;
+        wrap.innerHTML=rows.map(function(line,i){
+            return '<div class="prep-quick-row" data-i="'+i+'"><select onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()">'+quickOpts+'</select><input type="text" placeholder="Optional custom text or {Column Name} template" value="'+App.esc(line.text||'')+'" oninput="App.saveHuddlePrepSettings();App.updatePrepPreview()"><button class="btn btn-sm btn-d" onclick="App.removePrepQuickLine('+i+')">&times;</button></div>';
+        }).join('');
+        rows.forEach(function(line,i){var sel=wrap.querySelector('.prep-quick-row[data-i="'+i+'"] select');if(sel)sel.value=line.kind||''});
+    },
+    addPrepQuickLine:function(){var rows=this.saveHuddlePrepSettings().quickLines||[];rows.push({kind:'custom',text:''});this.renderPrepQuickLineRows(rows);this.saveHuddlePrepSettings();this.updatePrepPreview()},
+    removePrepQuickLine:function(i){var rows=this.saveHuddlePrepSettings().quickLines||[];rows.splice(i,1);this.renderPrepQuickLineRows(rows);this.saveHuddlePrepSettings();this.updatePrepPreview()},
     prepAgeFromDOB:function(value){
         var raw=String(value||'').trim();if(!raw)return'';
         if(/^\d{1,3}$/.test(raw))return raw;
@@ -3624,9 +3656,28 @@ var App={
         if(d.tasks)bits.push('Assigned tasks: '+d.tasks+'.');
         return bits.join(' ');
     },
-    prepQuickLineText:function(m,d,key){
+    prepTemplateValue:function(m,d,name){
+        var key=normHeader(name),built={
+            'name':d.name||this.hName(m),'member name':d.name||this.hName(m),'member id':d.id||this.hMemberId(m),'id':d.id||this.hMemberId(m),
+            'age':d.age,'sex':d.sex,'gender':d.sex,'plan':d.plan,'primary provider':d.primary,'pcp':d.primary||this.pcpOf(m),'attributed provider':d.attributed,
+            'case manager':this.hCM(m),'cm':this.hCM(m),'history':d.history,'conditions':d.history,'last hra date':d.lastHra,'hra due date':d.hraDue,
+            'missed appointments':d.missed,'most recent appointment':d.recentAppt,'er visits':d.er,'inpatient admissions':d.ip,'most recent er/ip':d.recentUtil,
+            'assigned tasks':d.tasks,'tasks':d.tasks,'care plan':d.carePlan,'talking points':d.carePlan
+        };
+        if(Object.prototype.hasOwnProperty.call(built,key))return built[key]||'';
+        var sources=this.prepSourceFields(),found=sources.find(function(s){return normHeader(s.label)===key||normHeader(s.key)===key});
+        return found?this.prepSourceValue(m,found.key):'';
+    },
+    prepApplyTemplate:function(m,d,text){
+        var self=this;
+        return String(text||'').replace(/\{([^}]+)\}/g,function(_,name){return self.prepTemplateValue(m,d,name.trim())}).replace(/\s+/g,' ').trim();
+    },
+    prepQuickLineText:function(m,d,line){
+        var key=typeof line==='string'?line:(line&&line.kind)||'',custom=typeof line==='object'?(line.text||''):'';
         function plural(n,s,p){return String(n)==='1'?s:(p||s+'s')}
         function clean(rows,keys){return (rows||[]).filter(function(r){return keys.some(function(k){return String((r||{})[k]||'').trim()})})}
+        if(custom&&(key==='custom'||!key))return this.prepApplyTemplate(m,d,custom);
+        if(custom&&key!=='custom'){var prefix=this.prepApplyTemplate(m,d,custom);if(prefix)return prefix}
         if(!key)return'';
         if(key.indexOf('source:')===0)return this.prepSourceValue(m,key.slice(7));
         if(key==='ageSex')return [d.age?(d.age+' year old'):'',d.sex?String(d.sex).toLowerCase():''].filter(Boolean).join(' ');
@@ -3647,7 +3698,8 @@ var App={
     },
     buildPrepQuickList:function(m,d,settings){
         var lines=(settings&&settings.quickLines&&settings.quickLines.length?settings.quickLines:this.prepQuickDefaults().quickLines),self=this;
-        return lines.map(function(k){return self.prepQuickLineText(m,d,k)}).filter(function(v){return String(v||'').trim()}).join('\n');
+        lines=this.normalizePrepQuickLines(lines);
+        return lines.map(function(line){return self.prepQuickLineText(m,d,line)}).filter(function(v){return String(v||'').trim()}).join('\n');
     },
     buildPrepOutput:function(m,d,settings){
         settings=settings||this.getHuddlePrepSettings();
