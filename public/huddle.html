@@ -444,6 +444,9 @@
         .prep-table td{padding:6px;border-bottom:1px solid #edf0f3;vertical-align:top}
         .prep-table input,.prep-table select{width:100%;padding:6px 7px;font-family:var(--font);font-size:12px;background:var(--bg-2);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);box-sizing:border-box}
         .prep-row-actions{width:36px;text-align:right}
+        .prep-free-rows{display:grid;gap:8px;margin:10px 0}
+        .prep-free-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+        .prep-free-row input{width:100%;padding:10px 12px;font-family:var(--font);font-size:14px;background:var(--bg-2);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);box-sizing:border-box}
         .prep-narrative{white-space:pre-wrap;font-size:13px;line-height:1.5;color:var(--t2);background:var(--bg-2);border:1px solid var(--bd);border-radius:var(--r);padding:12px}
         @media(max-width:860px){.prep-shell{grid-template-columns:1fr}.prep-patients{max-height:180px}.prep-table{min-width:720px}.prep-table-wrap{overflow-x:auto}}
         .gen-mode-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:14px}
@@ -776,6 +779,8 @@
                 <div class="prep-form" id="prepFormWrap">
                     <div class="prep-section">
                         <h3 id="prepPatientTitle">Patient</h3>
+                        <div id="prepCustomRows" class="prep-free-rows"></div>
+                        <button class="btn btn-sm" style="margin-bottom:12px" onclick="App.addPrepCustomRow()">+ Add Row</button>
                         <div class="fg">
                             <div class="fi"><label>Age</label><input type="number" id="prepAge" min="0" max="130" oninput="App.updatePrepPreview()"></div>
                             <div class="fi"><label>Sex</label><select id="prepSex" onchange="App.updatePrepPreview()"><option value="">Select...</option><option>Male</option><option>Female</option><option>Other</option></select></div>
@@ -813,16 +818,6 @@
                     <div class="prep-section">
                         <h3>Assigned Tasks</h3>
                         <textarea id="prepAssignedTasks" rows="3" oninput="App.updatePrepPreview()" style="width:100%;padding:10px 12px;font-family:var(--font);font-size:14px;background:var(--bg-2);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);resize:vertical"></textarea>
-                    </div>
-                    <div class="prep-section">
-                        <h3>Patient Prep Rows</h3>
-                        <div class="prep-filter-row" style="margin-bottom:10px">
-                            <button class="btn btn-p btn-sm" onclick="App.addPrepCustomRow()">+ Add Patient Row</button>
-                            <button class="btn btn-sm" onclick="App.addPrepCustomRowType()">Save Label For Everyone</button>
-                        </div>
-                        <input type="text" id="prepNewCustomRowLabel" placeholder="Optional reusable label, e.g. Called patient, Admission update" style="width:100%;padding:8px 10px;margin-bottom:10px;font-family:var(--font);font-size:13px;background:var(--bg-2);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);box-sizing:border-box">
-                        <datalist id="prepCustomRowLabels"></datalist>
-                        <div class="prep-table-wrap"><table class="prep-table"><thead><tr><th>Row</th><th>Date</th><th>Details</th><th></th></tr></thead><tbody id="prepCustomRows"></tbody></table></div>
                     </div>
                     <div class="prep-section">
                         <h3>Generated Readout</h3>
@@ -3497,6 +3492,12 @@ var App={
         rows=(rows||[]).filter(function(r){return Object.keys(r||{}).some(function(k){return String(r[k]||'').trim()})});
         this.setHval(m,h,rows.length?JSON.stringify(rows):'');
     },
+    prepCustomRowText:function(r){
+        if(!r)return'';
+        if(typeof r==='string')return r.trim();
+        if(r.text)return String(r.text||'').trim();
+        return [r.label,r.date,r.detail].filter(Boolean).join(' - ').trim();
+    },
     getPrepCustomRowTypes:function(){try{return JSON.parse(localStorage.getItem('mm_huddle_prep_custom_rows')||'[]')}catch(e){return[]}},
     savePrepCustomRowTypes:function(rows){rows=(rows||[]).map(function(x){return String(x||'').trim()}).filter(Boolean);var seen={},out=[];rows.forEach(function(x){var k=normHeader(x);if(!seen[k]){seen[k]=true;out.push(x)}});localStorage.setItem('mm_huddle_prep_custom_rows',JSON.stringify(out));return out},
     addPrepCustomRowType:function(){
@@ -3570,11 +3571,17 @@ var App={
     readPrepRows:function(type){
         var tbody=document.getElementById(type==='auth'?'prepAuthRows':type==='admit'?'prepAdmissionRows':type==='custom'?'prepCustomRows':'prepApptRows'),rows=[];
         if(!tbody)return rows;
+        if(type==='custom'){
+            tbody.querySelectorAll('.prep-free-row').forEach(function(row){
+                var input=row.querySelector('input');
+                rows.push({text:input?input.value.trim():''});
+            });
+            return rows;
+        }
         tbody.querySelectorAll('tr').forEach(function(tr){
             var inputs=tr.querySelectorAll('input,select');
             if(type==='auth')rows.push({what:inputs[0].value.trim(),status:inputs[1].value.trim(),date:inputs[2].value.trim(),notes:inputs[3].value.trim()});
             else if(type==='admit')rows.push({admit:inputs[0].value.trim(),discharge:inputs[1].value.trim(),reason:inputs[2].value.trim(),notes:inputs[3].value.trim()});
-            else if(type==='custom')rows.push({label:inputs[0].value.trim(),date:inputs[1].value.trim(),detail:inputs[2].value.trim(),global:tr.dataset.global==='1'});
             else rows.push({date:inputs[0].value.trim(),type:inputs[1].value.trim(),status:inputs[2].value.trim(),notes:inputs[3].value.trim()});
         });
         return rows;
@@ -3590,7 +3597,7 @@ var App={
         this.prepSetJson(m,'Prep Recent Authorizations',this.readPrepRows('auth'));
         this.prepSetJson(m,'Prep Appointments',this.readPrepRows('appt'));
         this.prepSetJson(m,'Prep Admissions',this.readPrepRows('admit'));
-        this.prepSetJson(m,'Prep Custom Rows',this.readPrepRows('custom').filter(function(r){return !r.global||r.date||r.detail}));
+        this.prepSetJson(m,'Prep Custom Rows',this.readPrepRows('custom').filter(function(r){return String(r.text||'').trim()}));
         var settings=this.saveHuddlePrepSettings();
         this.setHval(m,'Prep Last Readout',this.buildPrepOutput(m,this.prepFormData(m),settings));
         this.setHval(m,'Prep Last Prepared Date',this.prepToday());
@@ -3615,13 +3622,11 @@ var App={
         }).join('');
     },
     renderPrepCustomRows:function(rows){
-        var saved=rows||this.prepJson(this.prepCurrentMember(),'Prep Custom Rows'),types=this.getPrepCustomRowTypes(),seen={},self=this,out=[];
-        saved.forEach(function(r){if(r&&r.label){seen[normHeader(r.label)]=true;out.push(r)}});
-        types.forEach(function(label){if(!seen[normHeader(label)])out.push({label:label,date:'',detail:'',global:true})});
-        var list=document.getElementById('prepCustomRowLabels');if(list)list.innerHTML=types.map(function(x){return '<option value="'+self.esc(x)+'"></option>'}).join('');
-        document.getElementById('prepCustomRows').innerHTML=(out.length?out:[{}]).map(function(r,i){
-            var global=r.global?'1':'0',remove=r.global&&!r.date&&!r.detail?'':'<button class="btn btn-sm btn-d" onclick="App.removePrepCustomRow('+i+')">&times;</button>';
-            return '<tr data-global="'+global+'"><td><input list="prepCustomRowLabels" value="'+self.esc(r.label||'')+'" placeholder="Called patient, Admission note..." oninput="App.updatePrepPreview()"></td><td><input type="date" value="'+self.esc(r.date||'')+'" oninput="App.updatePrepPreview()"></td><td><input value="'+self.esc(r.detail||'')+'" placeholder="What happened / what to read out" oninput="App.updatePrepPreview()"></td><td class="prep-row-actions">'+remove+'</td></tr>';
+        var saved=(rows||this.prepJson(this.prepCurrentMember(),'Prep Custom Rows')).map(function(r){return {text:App.prepCustomRowText(r)}});
+        var list=saved.length?saved:[{text:''}],self=this,wrap=document.getElementById('prepCustomRows');
+        if(!wrap)return;
+        wrap.innerHTML=list.map(function(r,i){
+            return '<div class="prep-free-row" data-i="'+i+'"><input value="'+self.esc(r.text||'')+'" placeholder="Type a prep line and press Enter" onkeydown="App.prepCustomRowKey(event,'+i+')" oninput="App.updatePrepPreview()"><button class="btn btn-sm btn-d" onclick="App.removePrepCustomRow('+i+')">&times;</button></div>';
         }).join('');
     },
     addPrepAuth:function(){var m=this.prepCurrentMember();if(!m)return;var rows=this.readPrepRows('auth');rows.push({});this.renderPrepAuthRows(rows);this.updatePrepPreview()},
@@ -3630,8 +3635,10 @@ var App={
     removePrepAppointment:function(i){var m=this.prepCurrentMember();if(!m)return;var rows=this.readPrepRows('appt');rows.splice(i,1);this.renderPrepAppointmentRows(rows);this.updatePrepPreview()},
     addPrepAdmission:function(){var m=this.prepCurrentMember();if(!m)return;var rows=this.readPrepRows('admit');rows.push({});this.renderPrepAdmissionRows(rows);this.updatePrepPreview()},
     removePrepAdmission:function(i){var m=this.prepCurrentMember();if(!m)return;var rows=this.readPrepRows('admit');rows.splice(i,1);this.renderPrepAdmissionRows(rows);this.updatePrepPreview()},
-    addPrepCustomRow:function(){var m=this.prepCurrentMember();if(!m)return;var rows=this.readPrepRows('custom');rows.push({label:'',date:'',detail:'',global:false});this.renderPrepCustomRows(rows);this.updatePrepPreview()},
-    removePrepCustomRow:function(i){var m=this.prepCurrentMember();if(!m)return;var rows=this.readPrepRows('custom');rows.splice(i,1);this.renderPrepCustomRows(rows);this.updatePrepPreview()},
+    addPrepCustomRow:function(){var m=this.prepCurrentMember();if(!m)return;var rows=this.readPrepRows('custom');rows.push({text:''});this.renderPrepCustomRows(rows);this.focusPrepCustomRow(rows.length-1);this.updatePrepPreview()},
+    prepCustomRowKey:function(e,i){if(e.key!=='Enter')return;e.preventDefault();var rows=this.readPrepRows('custom');rows.splice(i+1,0,{text:''});this.renderPrepCustomRows(rows);this.focusPrepCustomRow(i+1);this.updatePrepPreview()},
+    focusPrepCustomRow:function(i){setTimeout(function(){var el=document.querySelector('#prepCustomRows .prep-free-row[data-i="'+i+'"] input');if(el)el.focus()},0)},
+    removePrepCustomRow:function(i){var m=this.prepCurrentMember();if(!m)return;var rows=this.readPrepRows('custom');rows.splice(i,1);this.renderPrepCustomRows(rows.length?rows:[{text:''}]);this.updatePrepPreview()},
     prepFormData:function(m){
         return {
             name:this.hName(m)||'the member',id:this.hMemberId(m),sex:this.prepField('prepSex')||this.hval(m,'Prep Sex'),age:this.prepAgeFromDOB(this.prepField('prepAge')||this.hval(m,'Prep Age')),plan:this.prepField('prepPlan')||this.hval(m,'Prep Plan'),
@@ -3644,7 +3651,7 @@ var App={
             auths:this.readPrepRows('auth').filter(function(r){return Object.keys(r).some(function(k){return String(r[k]||'').trim()})}),
             appts:this.readPrepRows('appt').filter(function(r){return Object.keys(r).some(function(k){return String(r[k]||'').trim()})}),
             admissions:this.readPrepRows('admit').filter(function(r){return Object.keys(r).some(function(k){return String(r[k]||'').trim()})}),
-            customRows:this.readPrepRows('custom').filter(function(r){return (!r.global||r.date||r.detail)&&(r.label||r.date||r.detail)})
+            customRows:this.readPrepRows('custom').filter(function(r){return String(r.text||'').trim()})
         };
     },
     prepSavedData:function(m){
@@ -3686,8 +3693,8 @@ var App={
         if(auths.length)bits.push('Recent authorizations include '+auths.map(function(a){return [a.what,a.status,a.date,a.notes].filter(Boolean).join(', ')}).join('; ')+'.');
         var appts=cleanList(d.appts,['date','type','status','notes']);
         if(appts.length)bits.push('Appointment details include '+appts.map(function(a){return [a.date,a.type,a.status,a.notes].filter(Boolean).join(', ')}).join('; ')+'.');
-        var custom=cleanList(d.customRows,['label','date','detail']);
-        if(custom.length)bits.push('Additional patient updates include '+custom.map(function(r){return [r.label,r.date,r.detail].filter(Boolean).join(' - ')}).join('; ')+'.');
+        var custom=(d.customRows||[]).map(function(r){return App.prepCustomRowText(r)}).filter(Boolean);
+        if(custom.length)bits=bits.concat(custom);
         if(d.carePlan)bits.push('For today\'s huddle, review '+d.carePlan+'.');
         if(d.tasks)bits.push('Assigned tasks: '+d.tasks+'.');
         return bits.join(' ');
@@ -3699,7 +3706,7 @@ var App={
             'case manager':this.hCM(m),'cm':this.hCM(m),'history':d.history,'conditions':d.history,'last hra date':d.lastHra,'hra due date':d.hraDue,
             'missed appointments':d.missed,'most recent appointment':d.recentAppt,'er visits':d.er,'inpatient admissions':d.ip,'most recent er/ip':d.recentUtil,
             'assigned tasks':d.tasks,'tasks':d.tasks,'care plan':d.carePlan,'talking points':d.carePlan
-            ,'custom rows':(d.customRows||[]).map(function(r){return [r.label,r.date,r.detail].filter(Boolean).join(' - ')}).filter(Boolean).join('; '),'patient updates':(d.customRows||[]).map(function(r){return [r.label,r.date,r.detail].filter(Boolean).join(' - ')}).filter(Boolean).join('; ')
+            ,'custom rows':(d.customRows||[]).map(function(r){return App.prepCustomRowText(r)}).filter(Boolean).join('; '),'patient updates':(d.customRows||[]).map(function(r){return App.prepCustomRowText(r)}).filter(Boolean).join('; ')
         };
         if(Object.prototype.hasOwnProperty.call(built,key))return built[key]||'';
         var sources=this.prepSourceFields(),found=sources.find(function(s){return normHeader(s.label)===key||normHeader(s.key)===key});
@@ -3725,7 +3732,7 @@ var App={
         if(key==='recentAuths'){var a=clean(d.auths,['what','status','date','notes']);return a.length?'Authorizations: '+a.map(function(x){return [x.what,x.status,x.date,x.notes].filter(Boolean).join(', ')}).join('; '):''}
         if(key==='admissions'){var ad=clean(d.admissions,['admit','discharge','reason','notes']);return ad.length?'Admissions: '+ad.map(function(x){return [x.admit?('admit '+x.admit):'',x.discharge?('discharge '+x.discharge):'',x.reason,x.notes].filter(Boolean).join(', ')}).join('; '):''}
         if(key==='appointments'){var ap=clean(d.appts,['date','type','status','notes']);return ap.length?'Appointments: '+ap.map(function(x){return [x.date,x.type,x.status,x.notes].filter(Boolean).join(', ')}).join('; '):''}
-        if(key==='customRows'){var cr=clean(d.customRows,['label','date','detail']);return cr.length?'Patient updates: '+cr.map(function(x){return [x.label,x.date,x.detail].filter(Boolean).join(' - ')}).join('; '):''}
+        if(key==='customRows'){var cr=(d.customRows||[]).map(function(x){return App.prepCustomRowText(x)}).filter(Boolean);return cr.join('\n')}
         if(key==='carePlan')return d.carePlan?('Plan: '+d.carePlan):'';
         if(key==='tasks')return d.tasks?('Tasks: '+d.tasks):'';
         return'';
@@ -3787,7 +3794,7 @@ var App={
             var cleanAuths=(d.auths||[]).filter(function(a){return Object.keys(a||{}).some(function(k){return String(a[k]||'').trim()})});
             var cleanAdmissions=(d.admissions||[]).filter(function(a){return Object.keys(a||{}).some(function(k){return String(a[k]||'').trim()})});
             var cleanAppts=(d.appts||[]).filter(function(a){return Object.keys(a||{}).some(function(k){return String(a[k]||'').trim()})});
-            var cleanCustom=(d.customRows||[]).filter(function(a){return Object.keys(a||{}).some(function(k){return String(a[k]||'').trim()})});
+            var cleanCustom=(d.customRows||[]).map(function(a){return self.prepCustomRowText(a)}).filter(Boolean);
             var narrLines=lines(narr,w-10,9.4),summaryRows=Math.ceil(summaryFields.length/3),cardH=24+summaryRows*12+narrLines.length*lh(9.4)+12;
             ensure(Math.min(cardH,90));
             doc.setDrawColor(203,213,225);doc.setFillColor(255,255,255);doc.roundedRect(x,y,w,Math.min(cardH,bottom-y),2,2,'FD');
@@ -3804,7 +3811,7 @@ var App={
             if(narrLines.length*lh(9.4)>remaining){doc.text(narrLines.slice(0,Math.max(1,Math.floor(remaining/lh(9.4)))),x+5,fy,{baseline:'top'});doc.addPage();y=mT;doc.text(narrLines.slice(Math.max(1,Math.floor(remaining/lh(9.4)))),x,y,{baseline:'top'});y+=narrLines.slice(Math.max(1,Math.floor(remaining/lh(9.4)))).length*lh(9.4)+8}
             else{doc.text(narrLines,x+5,fy,{baseline:'top'});y=fy+narrLines.length*lh(9.4)+8}
             if(d.tasks){ensure(16);doc.setFont('helvetica','bold');doc.setFontSize(7.2);doc.setTextColor(100,116,139);doc.text('ASSIGNED TASKS',x+5,y,{baseline:'top'});y+=lh(7.2);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(17,24,39);var taskLines=lines(d.tasks,w-10,8.5);doc.text(taskLines,x+5,y,{baseline:'top'});y+=taskLines.length*lh(8.5)+4}
-            if(cleanCustom.length){ensure(18);doc.setFont('helvetica','bold');doc.setFontSize(7.2);doc.setTextColor(100,116,139);doc.text('CUSTOM PATIENT ROWS',x+5,y,{baseline:'top'});y+=lh(7.2);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(17,24,39);var customText=cleanCustom.map(function(a){return '- '+[a.label,a.date,a.detail].filter(Boolean).join(' | ')}).join('\\n'),customLines=lines(customText,w-10,8.5);doc.text(customLines,x+5,y,{baseline:'top'});y+=customLines.length*lh(8.5)+4}
+            if(cleanCustom.length){ensure(18);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(17,24,39);var customText=cleanCustom.map(function(a){return '- '+a}).join('\\n'),customLines=lines(customText,w-10,8.5);doc.text(customLines,x+5,y,{baseline:'top'});y+=customLines.length*lh(8.5)+4}
             if(cleanAdmissions.length){ensure(18);doc.setFont('helvetica','bold');doc.setFontSize(7.2);doc.setTextColor(100,116,139);doc.text('ADMISSIONS',x+5,y,{baseline:'top'});y+=lh(7.2);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(17,24,39);var admitText=cleanAdmissions.map(function(a){return '- '+[a.admit?('Admit '+a.admit):'',a.discharge?('Discharge '+a.discharge):'',a.reason,a.notes].filter(Boolean).join(' | ')}).join('\\n'),admitLines=lines(admitText,w-10,8.5);doc.text(admitLines,x+5,y,{baseline:'top'});y+=admitLines.length*lh(8.5)+4}
             if(cleanAuths.length){ensure(18);doc.setFont('helvetica','bold');doc.setFontSize(7.2);doc.setTextColor(100,116,139);doc.text('RECENT AUTHORIZATIONS',x+5,y,{baseline:'top'});y+=lh(7.2);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(17,24,39);var authText=cleanAuths.map(function(a){return '- '+[a.what,a.status,a.date,a.notes].filter(Boolean).join(' | ')}).join('\\n'),authLines=lines(authText,w-10,8.5);doc.text(authLines,x+5,y,{baseline:'top'});y+=authLines.length*lh(8.5)+4}
             if(cleanAppts.length){ensure(18);doc.setFont('helvetica','bold');doc.setFontSize(7.2);doc.setTextColor(100,116,139);doc.text('APPOINTMENT DETAILS',x+5,y,{baseline:'top'});y+=lh(7.2);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(17,24,39);var apptText=cleanAppts.map(function(a){return '- '+[a.date,a.type,a.status,a.notes].filter(Boolean).join(' | ')}).join('\\n'),apptLines=lines(apptText,w-10,8.5);doc.text(apptLines,x+5,y,{baseline:'top'});y+=apptLines.length*lh(8.5)+4}
