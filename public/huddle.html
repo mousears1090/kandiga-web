@@ -775,6 +775,7 @@
                 <h3>Output Style</h3>
                 <div class="fg" style="margin-bottom:10px">
                     <div class="fi"><label>Prep Output</label><select id="prepOutputStyle" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"><option value="script">Script Readout</option><option value="quick">Quick List</option></select></div>
+                    <div class="fi"><label>Line Marker</label><select id="prepLineMarker" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"><option value="bullet">Bullet</option><option value="dash">Dash</option><option value="number">Number</option><option value="none">None</option></select></div>
                 </div>
                 <h3>Card Header Fields</h3>
                 <div class="prep-quick-list" id="prepHeaderFields" style="margin-bottom:10px"></div>
@@ -3379,6 +3380,7 @@ var App={
         var s={title:(document.getElementById('prepPdfTitle')||{}).value||'Huddle Prep Notes',fileName:(document.getElementById('prepPdfFileName')||{}).value||'huddle-prep-notes.pdf',
             mode:this.prepMode||localStorage.getItem('mm_huddle_prep_mode')||'lines',
             outputStyle:(document.getElementById('prepOutputStyle')||{}).value||'script',
+            lineMarker:(document.getElementById('prepLineMarker')||{}).value||'bullet',
             headerFields:headerRows,
             quickLines:quickRows};
         localStorage.setItem('mm_huddle_prep',JSON.stringify(s));return s;
@@ -3446,6 +3448,7 @@ var App={
     prepPopulateOutputOptions:function(settings){
         settings=settings||this.getHuddlePrepSettings();var defs=this.prepQuickDefaults(),self=this;
         var style=document.getElementById('prepOutputStyle');if(style)style.value=settings.outputStyle||'script';
+        var marker=document.getElementById('prepLineMarker');if(marker)marker.value=settings.lineMarker||'bullet';
         this.renderPrepHeaderRows(this.normalizePrepHeaderFields(Object.prototype.hasOwnProperty.call(settings,'headerFields')?settings.headerFields:defs.headerFields));
         this.renderPrepQuickLineRows(this.normalizePrepQuickLines(Object.prototype.hasOwnProperty.call(settings,'quickLines')?settings.quickLines:defs.quickLines));
     },
@@ -3842,16 +3845,24 @@ var App={
         if(settings.mode==='lines')return this.prepCustomRows(d.customRows||[]).map(function(r){return (r.sub?'  - ':'')+r.text}).join('\n');
         return settings.outputStyle==='quick'?this.buildPrepQuickList(m,d,settings):this.buildPrepNarrative(d);
     },
-    renderPrepLinePreview:function(rows){
+    prepLineMarker:function(row,i,settings){
+        if(row&&row.sub)return '↳';
+        var marker=(settings&&settings.lineMarker)||'bullet';
+        if(marker==='number')return String(i+1);
+        if(marker==='dash')return '-';
+        if(marker==='none')return '';
+        return '•';
+    },
+    renderPrepLinePreview:function(rows,settings){
         var self=this;
         rows=this.prepCustomRows(rows||[]);
         if(!rows.length)return '<div class="prep-line-preview"><div class="prep-line-preview-row"><div class="prep-line-preview-num">1</div><div class="prep-line-preview-text" style="color:var(--t3)">No lines yet.</div></div></div>';
-        return '<div class="prep-line-preview">'+rows.map(function(row,i){return '<div class="prep-line-preview-row '+(row.sub?'is-sub':'')+'"><div class="prep-line-preview-num">'+(row.sub?'↳':(i+1))+'</div><div class="prep-line-preview-text">'+self.esc(row.text)+'</div></div>'}).join('')+'</div>';
+        return '<div class="prep-line-preview">'+rows.map(function(row,i){return '<div class="prep-line-preview-row '+(row.sub?'is-sub':'')+'"><div class="prep-line-preview-num">'+self.esc(self.prepLineMarker(row,i,settings))+'</div><div class="prep-line-preview-text">'+self.esc(row.text)+'</div></div>'}).join('')+'</div>';
     },
     updatePrepPreview:function(){
         var m=this.prepCurrentMember();if(!m)return;
         var settings=this.saveHuddlePrepSettings(),d=this.prepFormData(m),el=document.getElementById('prepNarrative');
-        if(settings.mode==='lines')el.innerHTML=this.renderPrepLinePreview(d.customRows||[]);
+        if(settings.mode==='lines')el.innerHTML=this.renderPrepLinePreview(d.customRows||[],settings);
         else el.textContent=this.buildPrepOutput(m,d,settings);
     },
     stampPrepReadouts:function(rows){
@@ -3905,7 +3916,7 @@ var App={
             fy+=summaryRows?summaryRows*12+4:0;
             if(lineMode){
                 if(!lineRows.length)lineRows=[{text:'No lines yet.',sub:false}];
-                lineRows.forEach(function(row,i){ensure(10);doc.setDrawColor(226,232,240);doc.setFillColor(row.sub?251:(i%2?255:248),row.sub?252:(i%2?255:250),row.sub?253:(i%2?255:252));doc.rect(x+5,fy,w-10,10,'FD');doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(100,116,139);doc.text(row.sub?'↳':String(i+1),x+9,fy+5,{baseline:'middle'});doc.setFont('helvetica','normal');doc.setFontSize(8.8);doc.setTextColor(17,24,39);doc.text(lines(row.text,w-(row.sub?34:24),8.8).slice(0,2),x+(row.sub?26:18),fy+2.4,{baseline:'top'});fy+=10});
+                lineRows.forEach(function(row,i){var mark=self.prepLineMarker(row,i,settings),textX=x+(row.sub?26:(mark?18:10)),textW=w-(row.sub?34:(mark?24:16));ensure(10);doc.setDrawColor(226,232,240);doc.setFillColor(row.sub?251:(i%2?255:248),row.sub?252:(i%2?255:250),row.sub?253:(i%2?255:252));doc.rect(x+5,fy,w-10,10,'FD');doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(100,116,139);if(mark)doc.text(mark,x+9,fy+5,{baseline:'middle'});doc.setFont('helvetica','normal');doc.setFontSize(8.8);doc.setTextColor(17,24,39);doc.text(lines(row.text,textW,8.8).slice(0,2),textX,fy+2.4,{baseline:'top'});fy+=10});
                 y=fy+8;
             }else{
                 doc.setFont('helvetica','bold');doc.setFontSize(7.2);doc.setTextColor(100,116,139);doc.text(settings.outputStyle==='quick'?'QUICK LIST':'READOUT',x+5,fy,{baseline:'top'});fy+=lh(7.2);
