@@ -426,6 +426,8 @@
         .prep-filters{display:grid;gap:7px;padding:10px;border-bottom:1px solid var(--bd);background:#fbfcfd}
         .prep-filters input,.prep-filters select{width:100%;padding:7px 8px;font-family:var(--font);font-size:12px;background:var(--bg-1);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);box-sizing:border-box}
         .prep-filter-row{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+        .prep-mode-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+        .prep-mode-tabs .btn.active{background:var(--acc);border-color:var(--acc);color:white}
         .prep-quick-list{display:grid;gap:8px}
         .prep-quick-row{display:grid;grid-template-columns:minmax(160px,220px) minmax(0,1fr) auto;gap:8px;align-items:center}
         .prep-quick-row select,.prep-quick-row input{width:100%;padding:8px 10px;font-family:var(--font);font-size:13px;background:var(--bg-2);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);box-sizing:border-box}
@@ -444,9 +446,13 @@
         .prep-table td{padding:6px;border-bottom:1px solid #edf0f3;vertical-align:top}
         .prep-table input,.prep-table select{width:100%;padding:6px 7px;font-family:var(--font);font-size:12px;background:var(--bg-2);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);box-sizing:border-box}
         .prep-row-actions{width:36px;text-align:right}
-        .prep-free-rows{display:grid;gap:8px;margin:10px 0}
-        .prep-free-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
-        .prep-free-row input{width:100%;padding:10px 12px;font-family:var(--font);font-size:14px;background:var(--bg-2);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);box-sizing:border-box}
+        .prep-free-rows{display:grid;margin:10px 0;border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;background:var(--bg-1)}
+        .prep-free-row{display:grid;grid-template-columns:42px minmax(0,1fr) 42px;align-items:center;border-bottom:1px solid #edf0f3}
+        .prep-free-row:last-child{border-bottom:0}
+        .prep-free-num{height:100%;display:flex;align-items:center;justify-content:center;background:#f8fafc;border-right:1px solid #edf0f3;font-size:12px;font-weight:800;color:var(--t3)}
+        .prep-free-row input{width:100%;padding:11px 12px;font-family:var(--font);font-size:14px;background:var(--bg-1);border:0;color:var(--t1);box-sizing:border-box}
+        .prep-free-row input:focus{outline:2px solid rgba(13,147,115,.18);outline-offset:-2px}
+        .prep-free-row .btn{border-radius:0;border:0;border-left:1px solid #edf0f3;height:100%;min-height:42px}
         .prep-narrative{white-space:pre-wrap;font-size:13px;line-height:1.5;color:var(--t2);background:var(--bg-2);border:1px solid var(--bd);border-radius:var(--r);padding:12px}
         @media(max-width:860px){.prep-shell{grid-template-columns:1fr}.prep-patients{max-height:180px}.prep-table{min-width:720px}.prep-table-wrap{overflow-x:auto}}
         .gen-mode-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:14px}
@@ -747,7 +753,12 @@
                 <button class="btn" onclick="App.showHuddlePrepMapModal()">Map Prep Fields</button>
                 <button class="btn btn-sm" onclick="App.applyPrepMappingsToRows(false)">Fill Missing From Mappings</button>
             </div>
-            <div class="prep-section" style="margin-bottom:14px">
+            <div class="prep-mode-tabs">
+                <button class="btn active" id="prepModeLinesBtn" onclick="App.setPrepMode('lines')">Lines</button>
+                <button class="btn" id="prepModeDetailsBtn" onclick="App.setPrepMode('details')">Details</button>
+                <button class="btn" id="prepModeSetupBtn" onclick="App.setPrepMode('setup')">PDF Setup</button>
+            </div>
+            <div class="prep-section prep-settings-section" style="margin-bottom:14px;display:none">
                 <h3>Output Style</h3>
                 <div class="fg" style="margin-bottom:10px">
                     <div class="fi"><label>Prep Output</label><select id="prepOutputStyle" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"><option value="script">Script Readout</option><option value="quick">Quick List</option></select></div>
@@ -781,7 +792,7 @@
                         <h3 id="prepPatientTitle">Patient</h3>
                         <div id="prepCustomRows" class="prep-free-rows"></div>
                         <button class="btn btn-sm" style="margin-bottom:12px" onclick="App.addPrepCustomRow()">+ Add Row</button>
-                        <div class="fg">
+                        <div class="fg prep-detail-fields">
                             <div class="fi"><label>Age</label><input type="number" id="prepAge" min="0" max="130" oninput="App.updatePrepPreview()"></div>
                             <div class="fi"><label>Sex</label><select id="prepSex" onchange="App.updatePrepPreview()"><option value="">Select...</option><option>Male</option><option>Female</option><option>Other</option></select></div>
                             <div class="fi"><label>Plan</label><input type="text" id="prepPlan" oninput="App.updatePrepPreview()"></div>
@@ -793,12 +804,12 @@
                             <div class="fi"><label>Plan / Talking Points</label><textarea id="prepCarePlan" rows="3" oninput="App.updatePrepPreview()" style="width:100%;padding:10px 12px;font-family:var(--font);font-size:14px;background:var(--bg-2);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);resize:vertical"></textarea></div>
                         </div>
                     </div>
-                    <div class="prep-section">
+                    <div class="prep-section prep-detail-section">
                         <h3>Recent Authorizations</h3>
                         <div class="prep-table-wrap"><table class="prep-table"><thead><tr><th>What For</th><th>Status</th><th>Date</th><th>Notes</th><th></th></tr></thead><tbody id="prepAuthRows"></tbody></table></div>
                         <button class="btn btn-sm" style="margin-top:10px" onclick="App.addPrepAuth()">+ Add Authorization</button>
                     </div>
-                    <div class="prep-section">
+                    <div class="prep-section prep-detail-section">
                         <h3>Appointments & Utilization</h3>
                         <div class="fg" style="margin-bottom:10px">
                             <div class="fi"><label>Missed Appointments Past 12 Months</label><input type="number" id="prepMissedAppts" min="0" oninput="App.updatePrepPreview()"></div>
@@ -810,12 +821,12 @@
                         <div class="prep-table-wrap"><table class="prep-table"><thead><tr><th>Date</th><th>Type / Provider</th><th>Status</th><th>Notes</th><th></th></tr></thead><tbody id="prepApptRows"></tbody></table></div>
                         <button class="btn btn-sm" style="margin-top:10px" onclick="App.addPrepAppointment()">+ Add Appointment</button>
                     </div>
-                    <div class="prep-section">
+                    <div class="prep-section prep-detail-section">
                         <h3>Admissions</h3>
                         <div class="prep-table-wrap"><table class="prep-table"><thead><tr><th>Admit Date</th><th>Discharge Date</th><th>Reason</th><th>Notes</th><th></th></tr></thead><tbody id="prepAdmissionRows"></tbody></table></div>
                         <button class="btn btn-sm" style="margin-top:10px" onclick="App.addPrepAdmission()">+ Add Admission</button>
                     </div>
-                    <div class="prep-section">
+                    <div class="prep-section prep-detail-section">
                         <h3>Assigned Tasks</h3>
                         <textarea id="prepAssignedTasks" rows="3" oninput="App.updatePrepPreview()" style="width:100%;padding:10px 12px;font-family:var(--font);font-size:14px;background:var(--bg-2);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);resize:vertical"></textarea>
                     </div>
@@ -3494,9 +3505,13 @@ var App={
     },
     prepCustomRowText:function(r){
         if(!r)return'';
-        if(typeof r==='string')return r.trim();
-        if(r.text)return String(r.text||'').trim();
-        return [r.label,r.date,r.detail].filter(Boolean).join(' - ').trim();
+        var text=typeof r==='string'?r:(r.text?String(r.text||''):[r.label,r.date,r.detail].filter(Boolean).join(' - '));
+        return String(text||'').replace(/\\n/g,'\n').replace(/\r/g,'').trim();
+    },
+    prepCustomRowLines:function(rows){
+        var self=this,out=[];
+        (rows||[]).forEach(function(r){self.prepCustomRowText(r).split('\n').forEach(function(line){line=line.trim();if(line)out.push(line)})});
+        return out;
     },
     getPrepCustomRowTypes:function(){try{return JSON.parse(localStorage.getItem('mm_huddle_prep_custom_rows')||'[]')}catch(e){return[]}},
     savePrepCustomRowTypes:function(rows){rows=(rows||[]).map(function(x){return String(x||'').trim()}).filter(Boolean);var seen={},out=[];rows.forEach(function(x){var k=normHeader(x);if(!seen[k]){seen[k]=true;out.push(x)}});localStorage.setItem('mm_huddle_prep_custom_rows',JSON.stringify(out));return out},
@@ -3505,6 +3520,13 @@ var App={
         if(!label){this.toast('Type a reusable row label first','info');return}
         var rows=this.getPrepCustomRowTypes();rows.push(label);this.savePrepCustomRowTypes(rows);if(el)el.value='';
         this.renderPrepCustomRows();this.updatePrepPreview();this.toast('Reusable row added','success');
+    },
+    prepMode:'lines',
+    setPrepMode:function(mode){
+        mode=mode||'lines';this.prepMode=mode;try{localStorage.setItem('mm_huddle_prep_mode',mode)}catch(e){}
+        ['Lines','Details','Setup'].forEach(function(name){var btn=document.getElementById('prepMode'+name+'Btn');if(btn)btn.classList.toggle('active',name.toLowerCase()===mode)});
+        document.querySelectorAll('.prep-settings-section').forEach(function(el){el.style.display=mode==='setup'?'':'none'});
+        document.querySelectorAll('.prep-detail-fields,.prep-detail-section').forEach(function(el){el.style.display=mode==='details'?'':'none'});
     },
     prepField:function(id){var el=document.getElementById(id);return el?el.value.trim():''},
     prepToday:function(){return new Date().toISOString().slice(0,10)},
@@ -3538,7 +3560,7 @@ var App={
         var mapped=0,self=this;rows.forEach(function(m){if(self.applyPrepMappingsToMember(m,false))mapped++});if(mapped)this.writeMemberCSV();
         this.huddlePrepRows=rows;this.huddlePrepIndex=0;
         ['prepPatientSearch','prepFilterCM','prepFilterProvider','prepFilterField','prepFilterValue'].forEach(function(id){var el=document.getElementById(id);if(el)el.value=''});
-        document.getElementById('huddlePrepModal').classList.add('open');this.lockScroll();this.renderHuddlePrep();
+        document.getElementById('huddlePrepModal').classList.add('open');this.lockScroll();this.setPrepMode(localStorage.getItem('mm_huddle_prep_mode')||'lines');this.renderHuddlePrep();
     },
     hideHuddlePrepModal:function(){if(document.getElementById('huddlePrepModal').classList.contains('open'))this.saveCurrentHuddlePrep(true);document.getElementById('huddlePrepModal').classList.remove('open');this.unlockScroll()},
     renderHuddlePrep:function(){
@@ -3622,11 +3644,11 @@ var App={
         }).join('');
     },
     renderPrepCustomRows:function(rows){
-        var saved=(rows||this.prepJson(this.prepCurrentMember(),'Prep Custom Rows')).map(function(r){return {text:App.prepCustomRowText(r)}});
+        var saved=this.prepCustomRowLines(rows||this.prepJson(this.prepCurrentMember(),'Prep Custom Rows')).map(function(text){return {text:text}});
         var list=saved.length?saved:[{text:''}],self=this,wrap=document.getElementById('prepCustomRows');
         if(!wrap)return;
         wrap.innerHTML=list.map(function(r,i){
-            return '<div class="prep-free-row" data-i="'+i+'"><input value="'+self.esc(r.text||'')+'" placeholder="Type a prep line and press Enter" onkeydown="App.prepCustomRowKey(event,'+i+')" oninput="App.updatePrepPreview()"><button class="btn btn-sm btn-d" onclick="App.removePrepCustomRow('+i+')">&times;</button></div>';
+            return '<div class="prep-free-row" data-i="'+i+'"><div class="prep-free-num">'+(i+1)+'</div><input value="'+self.esc(r.text||'')+'" placeholder="Type a prep line and press Enter" onkeydown="App.prepCustomRowKey(event,'+i+')" oninput="App.updatePrepPreview()"><button class="btn btn-sm btn-d" onclick="App.removePrepCustomRow('+i+')">&times;</button></div>';
         }).join('');
     },
     addPrepAuth:function(){var m=this.prepCurrentMember();if(!m)return;var rows=this.readPrepRows('auth');rows.push({});this.renderPrepAuthRows(rows);this.updatePrepPreview()},
@@ -3693,7 +3715,7 @@ var App={
         if(auths.length)bits.push('Recent authorizations include '+auths.map(function(a){return [a.what,a.status,a.date,a.notes].filter(Boolean).join(', ')}).join('; ')+'.');
         var appts=cleanList(d.appts,['date','type','status','notes']);
         if(appts.length)bits.push('Appointment details include '+appts.map(function(a){return [a.date,a.type,a.status,a.notes].filter(Boolean).join(', ')}).join('; ')+'.');
-        var custom=(d.customRows||[]).map(function(r){return App.prepCustomRowText(r)}).filter(Boolean);
+        var custom=this.prepCustomRowLines(d.customRows||[]);
         if(custom.length)bits=bits.concat(custom);
         if(d.carePlan)bits.push('For today\'s huddle, review '+d.carePlan+'.');
         if(d.tasks)bits.push('Assigned tasks: '+d.tasks+'.');
@@ -3706,7 +3728,7 @@ var App={
             'case manager':this.hCM(m),'cm':this.hCM(m),'history':d.history,'conditions':d.history,'last hra date':d.lastHra,'hra due date':d.hraDue,
             'missed appointments':d.missed,'most recent appointment':d.recentAppt,'er visits':d.er,'inpatient admissions':d.ip,'most recent er/ip':d.recentUtil,
             'assigned tasks':d.tasks,'tasks':d.tasks,'care plan':d.carePlan,'talking points':d.carePlan
-            ,'custom rows':(d.customRows||[]).map(function(r){return App.prepCustomRowText(r)}).filter(Boolean).join('; '),'patient updates':(d.customRows||[]).map(function(r){return App.prepCustomRowText(r)}).filter(Boolean).join('; ')
+            ,'custom rows':this.prepCustomRowLines(d.customRows||[]).join('; '),'patient updates':this.prepCustomRowLines(d.customRows||[]).join('; ')
         };
         if(Object.prototype.hasOwnProperty.call(built,key))return built[key]||'';
         var sources=this.prepSourceFields(),found=sources.find(function(s){return normHeader(s.label)===key||normHeader(s.key)===key});
@@ -3732,7 +3754,7 @@ var App={
         if(key==='recentAuths'){var a=clean(d.auths,['what','status','date','notes']);return a.length?'Authorizations: '+a.map(function(x){return [x.what,x.status,x.date,x.notes].filter(Boolean).join(', ')}).join('; '):''}
         if(key==='admissions'){var ad=clean(d.admissions,['admit','discharge','reason','notes']);return ad.length?'Admissions: '+ad.map(function(x){return [x.admit?('admit '+x.admit):'',x.discharge?('discharge '+x.discharge):'',x.reason,x.notes].filter(Boolean).join(', ')}).join('; '):''}
         if(key==='appointments'){var ap=clean(d.appts,['date','type','status','notes']);return ap.length?'Appointments: '+ap.map(function(x){return [x.date,x.type,x.status,x.notes].filter(Boolean).join(', ')}).join('; '):''}
-        if(key==='customRows'){var cr=(d.customRows||[]).map(function(x){return App.prepCustomRowText(x)}).filter(Boolean);return cr.join('\n')}
+        if(key==='customRows'){var cr=this.prepCustomRowLines(d.customRows||[]);return cr.join('\n')}
         if(key==='carePlan')return d.carePlan?('Plan: '+d.carePlan):'';
         if(key==='tasks')return d.tasks?('Tasks: '+d.tasks):'';
         return'';
@@ -3794,7 +3816,7 @@ var App={
             var cleanAuths=(d.auths||[]).filter(function(a){return Object.keys(a||{}).some(function(k){return String(a[k]||'').trim()})});
             var cleanAdmissions=(d.admissions||[]).filter(function(a){return Object.keys(a||{}).some(function(k){return String(a[k]||'').trim()})});
             var cleanAppts=(d.appts||[]).filter(function(a){return Object.keys(a||{}).some(function(k){return String(a[k]||'').trim()})});
-            var cleanCustom=(d.customRows||[]).map(function(a){return self.prepCustomRowText(a)}).filter(Boolean);
+            var cleanCustom=self.prepCustomRowLines(d.customRows||[]);
             var narrLines=lines(narr,w-10,9.4),summaryRows=Math.ceil(summaryFields.length/3),cardH=24+summaryRows*12+narrLines.length*lh(9.4)+12;
             ensure(Math.min(cardH,90));
             doc.setDrawColor(203,213,225);doc.setFillColor(255,255,255);doc.roundedRect(x,y,w,Math.min(cardH,bottom-y),2,2,'FD');
