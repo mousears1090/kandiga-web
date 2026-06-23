@@ -815,14 +815,14 @@
                         <textarea id="prepAssignedTasks" rows="3" oninput="App.updatePrepPreview()" style="width:100%;padding:10px 12px;font-family:var(--font);font-size:14px;background:var(--bg-2);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);resize:vertical"></textarea>
                     </div>
                     <div class="prep-section">
-                        <h3>Custom Rows</h3>
+                        <h3>Patient Prep Rows</h3>
                         <div class="prep-filter-row" style="margin-bottom:10px">
-                            <input type="text" id="prepNewCustomRowLabel" placeholder="Reusable row label, e.g. Called patient">
-                            <button class="btn btn-sm" onclick="App.addPrepCustomRowType()">+ Add Reusable Row</button>
+                            <button class="btn btn-p btn-sm" onclick="App.addPrepCustomRow()">+ Add Patient Row</button>
+                            <button class="btn btn-sm" onclick="App.addPrepCustomRowType()">Save Label For Everyone</button>
                         </div>
+                        <input type="text" id="prepNewCustomRowLabel" placeholder="Optional reusable label, e.g. Called patient, Admission update" style="width:100%;padding:8px 10px;margin-bottom:10px;font-family:var(--font);font-size:13px;background:var(--bg-2);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);box-sizing:border-box">
                         <datalist id="prepCustomRowLabels"></datalist>
                         <div class="prep-table-wrap"><table class="prep-table"><thead><tr><th>Row</th><th>Date</th><th>Details</th><th></th></tr></thead><tbody id="prepCustomRows"></tbody></table></div>
-                        <button class="btn btn-sm" style="margin-top:10px" onclick="App.addPrepCustomRow()">+ Add Patient Row</button>
                     </div>
                     <div class="prep-section">
                         <h3>Generated Readout</h3>
@@ -3755,7 +3755,8 @@ var App={
     },
     downloadHuddlePrepPDF:function(){
         this.saveCurrentHuddlePrep(true);
-        var rows=this.huddlePrepRows||[];if(!rows.length){this.toast('No prep patients selected','danger');return}
+        var rows=this.filteredHuddlePrepRows();if(!rows.length)rows=this.huddlePrepRows||[];
+        if(!rows.length){this.toast('No prep patients selected','danger');return}
         if(!window.jspdf){this.toast('PDF engine is not loaded','danger');return}
         var settings=this.saveHuddlePrepSettings(),btn=document.getElementById('prepDownloadBtn'),old=btn.textContent;btn.disabled=true;btn.textContent='Generating...';
         try{this.stampPrepReadouts(rows);var doc=this.buildHuddlePrepPDFDoc(rows,settings);doc.save(this.pdfSafeName(settings.fileName));this.toast('Downloaded prep PDF','success')}
