@@ -740,6 +740,23 @@
                 <button class="btn" onclick="App.showHuddlePrepMapModal()">Map Prep Fields</button>
                 <button class="btn btn-sm" onclick="App.applyPrepMappingsToRows(false)">Fill Missing From Mappings</button>
             </div>
+            <div class="prep-section" style="margin-bottom:14px">
+                <h3>Output Style</h3>
+                <div class="fg" style="margin-bottom:10px">
+                    <div class="fi"><label>Prep Output</label><select id="prepOutputStyle" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"><option value="script">Script Readout</option><option value="quick">Quick List</option></select></div>
+                    <div class="fi"><label>Header Field 1</label><select id="prepHeaderField1" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
+                    <div class="fi"><label>Header Field 2</label><select id="prepHeaderField2" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
+                    <div class="fi"><label>Header Field 3</label><select id="prepHeaderField3" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
+                </div>
+                <div class="fg" id="prepQuickLineFields">
+                    <div class="fi"><label>Quick Line 1</label><select id="prepQuickLine1" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
+                    <div class="fi"><label>Quick Line 2</label><select id="prepQuickLine2" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
+                    <div class="fi"><label>Quick Line 3</label><select id="prepQuickLine3" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
+                    <div class="fi"><label>Quick Line 4</label><select id="prepQuickLine4" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
+                    <div class="fi"><label>Quick Line 5</label><select id="prepQuickLine5" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
+                    <div class="fi"><label>Quick Line 6</label><select id="prepQuickLine6" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()"></select></div>
+                </div>
+            </div>
             <div class="prep-shell">
                 <div class="prep-list">
                     <div class="prep-list-head" id="prepListHead">Active Patients</div>
@@ -3325,7 +3342,10 @@ var App={
     huddlePrepRows:[],huddlePrepIndex:0,
     getHuddlePrepSettings:function(){try{return JSON.parse(localStorage.getItem('mm_huddle_prep')||'{}')}catch(e){return{}}},
     saveHuddlePrepSettings:function(){
-        var s={title:(document.getElementById('prepPdfTitle')||{}).value||'Huddle Prep Notes',fileName:(document.getElementById('prepPdfFileName')||{}).value||'huddle-prep-notes.pdf'};
+        var s={title:(document.getElementById('prepPdfTitle')||{}).value||'Huddle Prep Notes',fileName:(document.getElementById('prepPdfFileName')||{}).value||'huddle-prep-notes.pdf',
+            outputStyle:(document.getElementById('prepOutputStyle')||{}).value||'script',
+            headerFields:[1,2,3].map(function(i){var el=document.getElementById('prepHeaderField'+i);return el?el.value:''}),
+            quickLines:[1,2,3,4,5,6].map(function(i){var el=document.getElementById('prepQuickLine'+i);return el?el.value:''})};
         localStorage.setItem('mm_huddle_prep',JSON.stringify(s));return s;
     },
     prepMapTargets:function(){
@@ -3363,6 +3383,28 @@ var App={
         if(key==='member.tier')return m.tier||'';
         if(key.indexOf('huddle:')===0)return this.hval(m,key.slice(7));
         return'';
+    },
+    prepQuickDefaults:function(){return {headerFields:['member.name','member.memberId','member.cm'],quickLines:['ageSex','providerSentence','history','hraSentence','utilization','tasks']}},
+    prepQuickFieldOptions:function(){
+        var base=[
+            {key:'',label:'-- Skip --'},{key:'ageSex',label:'Age / Sex line'},{key:'providerSentence',label:'Followed / attributed provider sentence'},
+            {key:'history',label:'History / Conditions'},{key:'hraSentence',label:'HRA sentence'},{key:'utilization',label:'Utilization sentence'},
+            {key:'recentAuths',label:'Recent authorizations'},{key:'admissions',label:'Admissions'},{key:'appointments',label:'Appointment details'},
+            {key:'carePlan',label:'Plan / Talking Points'},{key:'tasks',label:'Assigned Tasks'}
+        ],seen={};
+        base.forEach(function(o){seen[o.key]=true});
+        this.prepSourceFields().forEach(function(o){if(o.key&&!seen['source:'+o.key])base.push({key:'source:'+o.key,label:'Column: '+o.label})});
+        return base;
+    },
+    prepPopulateOutputOptions:function(settings){
+        settings=settings||this.getHuddlePrepSettings();var defs=this.prepQuickDefaults(),self=this;
+        var style=document.getElementById('prepOutputStyle');if(style)style.value=settings.outputStyle||'script';
+        var sourceOpts=this.prepSourceFields().map(function(o){return '<option value="'+self.esc(o.key)+'">'+self.esc(o.label)+'</option>'}).join('');
+        [1,2,3].forEach(function(i){var el=document.getElementById('prepHeaderField'+i),val=(settings.headerFields&&settings.headerFields[i-1])||defs.headerFields[i-1]||'';if(el){el.innerHTML=sourceOpts;el.value=val}});
+        var quickOpts=this.prepQuickFieldOptions().map(function(o){return '<option value="'+self.esc(o.key)+'">'+self.esc(o.label)+'</option>'}).join('');
+        var lines=(settings.quickLines&&settings.quickLines.length?settings.quickLines:defs.quickLines);
+        document.getElementById('prepQuickLineFields').innerHTML=[1,2,3,4,5,6].map(function(i){var val=lines[i-1]||'';return '<div class="fi"><label>Quick Line '+i+'</label><select id="prepQuickLine'+i+'" onchange="App.saveHuddlePrepSettings();App.updatePrepPreview()">'+quickOpts+'</select></div>'}).join('');
+        [1,2,3,4,5,6].forEach(function(i){var el=document.getElementById('prepQuickLine'+i);if(el)el.value=lines[i-1]||''});
     },
     prepAgeFromDOB:function(value){
         var raw=String(value||'').trim();if(!raw)return'';
@@ -3441,6 +3483,7 @@ var App={
         var s=this.getHuddlePrepSettings();
         document.getElementById('prepPdfTitle').value=s.title||'Huddle Prep Notes';
         document.getElementById('prepPdfFileName').value=s.fileName||'huddle-prep-notes.pdf';
+        this.prepPopulateOutputOptions(s);
         var mapped=0,self=this;rows.forEach(function(m){if(self.applyPrepMappingsToMember(m,false))mapped++});if(mapped)this.writeMemberCSV();
         this.huddlePrepRows=rows;this.huddlePrepIndex=0;
         ['prepPatientSearch','prepFilterCM','prepFilterProvider','prepFilterField','prepFilterValue'].forEach(function(id){var el=document.getElementById(id);if(el)el.value=''});
@@ -3495,9 +3538,10 @@ var App={
         this.prepSetJson(m,'Prep Recent Authorizations',this.readPrepRows('auth'));
         this.prepSetJson(m,'Prep Appointments',this.readPrepRows('appt'));
         this.prepSetJson(m,'Prep Admissions',this.readPrepRows('admit'));
-        this.setHval(m,'Prep Last Readout',this.buildPrepNarrative(this.prepFormData(m)));
+        var settings=this.saveHuddlePrepSettings();
+        this.setHval(m,'Prep Last Readout',this.buildPrepOutput(m,this.prepFormData(m),settings));
         this.setHval(m,'Prep Last Prepared Date',this.prepToday());
-        this.saveHuddlePrepSettings();this.writeMemberCSV();this.renderHuddle();if(!silent)this.toast('Prep saved','success');
+        this.writeMemberCSV();this.renderHuddle();if(!silent)this.toast('Prep saved','success');
     },
     renderPrepAuthRows:function(rows){
         rows=rows||this.prepJson(this.prepCurrentMember(),'Prep Recent Authorizations');var self=this;
@@ -3580,13 +3624,43 @@ var App={
         if(d.tasks)bits.push('Assigned tasks: '+d.tasks+'.');
         return bits.join(' ');
     },
+    prepQuickLineText:function(m,d,key){
+        function plural(n,s,p){return String(n)==='1'?s:(p||s+'s')}
+        function clean(rows,keys){return (rows||[]).filter(function(r){return keys.some(function(k){return String((r||{})[k]||'').trim()})})}
+        if(!key)return'';
+        if(key.indexOf('source:')===0)return this.prepSourceValue(m,key.slice(7));
+        if(key==='ageSex')return [d.age?(d.age+' year old'):'',d.sex?String(d.sex).toLowerCase():''].filter(Boolean).join(' ');
+        if(key==='providerSentence'){if(d.primary&&d.attributed)return 'Followed by PCP '+d.primary+' and attributed to '+d.attributed+'.';if(d.primary)return 'Followed by PCP '+d.primary+'.';if(d.attributed)return 'Attributed provider '+d.attributed+'.';return''}
+        if(key==='history')return d.history?('History: '+d.history):'';
+        if(key==='hraSentence'){if(d.lastHra&&d.hraDue)return 'Last HRA '+d.lastHra+'; HRA due '+d.hraDue+'.';if(d.lastHra)return 'Last HRA '+d.lastHra+'.';if(d.hraDue)return 'HRA due '+d.hraDue+'.';return''}
+        if(key==='utilization'){var p=[];if(d.missed)p.push(d.missed+' missed '+plural(d.missed,'appointment'));if(d.recentAppt)p.push('most recent kept appointment '+d.recentAppt);if(d.er)p.push(d.er+' ER '+plural(d.er,'visit'));if(d.ip)p.push(d.ip+' inpatient '+plural(d.ip,'admission'));if(d.recentUtil)p.push('most recent ER/IP '+d.recentUtil);return p.join('; ')}
+        if(key==='recentAuths'){var a=clean(d.auths,['what','status','date','notes']);return a.length?'Authorizations: '+a.map(function(x){return [x.what,x.status,x.date,x.notes].filter(Boolean).join(', ')}).join('; '):''}
+        if(key==='admissions'){var ad=clean(d.admissions,['admit','discharge','reason','notes']);return ad.length?'Admissions: '+ad.map(function(x){return [x.admit?('admit '+x.admit):'',x.discharge?('discharge '+x.discharge):'',x.reason,x.notes].filter(Boolean).join(', ')}).join('; '):''}
+        if(key==='appointments'){var ap=clean(d.appts,['date','type','status','notes']);return ap.length?'Appointments: '+ap.map(function(x){return [x.date,x.type,x.status,x.notes].filter(Boolean).join(', ')}).join('; '):''}
+        if(key==='carePlan')return d.carePlan?('Plan: '+d.carePlan):'';
+        if(key==='tasks')return d.tasks?('Tasks: '+d.tasks):'';
+        return'';
+    },
+    prepHeaderParts:function(m,d,settings){
+        var fields=(settings&&settings.headerFields&&settings.headerFields.length?settings.headerFields:this.prepQuickDefaults().headerFields),self=this;
+        return fields.map(function(k){return self.prepSourceValue(m,k)}).filter(function(v){return String(v||'').trim()});
+    },
+    buildPrepQuickList:function(m,d,settings){
+        var lines=(settings&&settings.quickLines&&settings.quickLines.length?settings.quickLines:this.prepQuickDefaults().quickLines),self=this;
+        return lines.map(function(k){return self.prepQuickLineText(m,d,k)}).filter(function(v){return String(v||'').trim()}).join('\n');
+    },
+    buildPrepOutput:function(m,d,settings){
+        settings=settings||this.getHuddlePrepSettings();
+        return settings.outputStyle==='quick'?this.buildPrepQuickList(m,d,settings):this.buildPrepNarrative(d);
+    },
     updatePrepPreview:function(){
         var m=this.prepCurrentMember();if(!m)return;
-        document.getElementById('prepNarrative').textContent=this.buildPrepNarrative(this.prepFormData(m));
+        var settings=this.saveHuddlePrepSettings();
+        document.getElementById('prepNarrative').textContent=this.buildPrepOutput(m,this.prepFormData(m),settings);
     },
     stampPrepReadouts:function(rows){
-        var self=this,today=this.prepToday();
-        (rows||[]).forEach(function(m){self.setHval(m,'Prep Last Readout',self.buildPrepNarrative(self.prepSavedData(m)));self.setHval(m,'Prep Last Prepared Date',today)});
+        var self=this,today=this.prepToday(),settings=this.saveHuddlePrepSettings();
+        (rows||[]).forEach(function(m){self.setHval(m,'Prep Last Readout',self.buildPrepOutput(m,self.prepSavedData(m),settings));self.setHval(m,'Prep Last Prepared Date',today)});
         this.writeMemberCSV();
     },
     downloadHuddlePrepPDF:function(){
@@ -3610,8 +3684,8 @@ var App={
         doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(91,101,115);doc.text('Generated '+new Date().toLocaleDateString()+' - '+rows.length+' patients',x,y,{baseline:'top'});y+=lh(9)+3;
         doc.setDrawColor(17,24,39);doc.line(x,y,x+w,y);y+=5;
         rows.forEach(function(m,idx){
-            var d=self.prepSavedData(m),title=self.hName(m)||'Unnamed',sub=[self.hMemberId(m),self.hCM(m)?'CM: '+self.hCM(m):'',self.pcpOf(m)?'PCP: '+self.pcpOf(m):''].filter(Boolean).join('  |  '),narr=self.buildPrepNarrative(d);
-            var summaryFields=[
+            var d=self.prepSavedData(m),headerParts=self.prepHeaderParts(m,d,settings),title=settings.outputStyle==='quick'?(headerParts[0]||self.hName(m)||'Unnamed'):(self.hName(m)||'Unnamed'),sub=settings.outputStyle==='quick'?headerParts.slice(1).join('  |  '):[self.hMemberId(m),self.hCM(m)?'CM: '+self.hCM(m):'',self.pcpOf(m)?'PCP: '+self.pcpOf(m):''].filter(Boolean).join('  |  '),narr=self.buildPrepOutput(m,d,settings);
+            var summaryFields=settings.outputStyle==='quick'?[]:[
                 ['Age / Sex',[d.age,d.sex].filter(Boolean).join(' / ')],
                 ['Plan',d.plan],
                 ['HRA',[(d.lastHra?'Last '+d.lastHra:''),(d.hraDue?'Due '+d.hraDue:'')].filter(Boolean).join(' | ')],
@@ -3632,7 +3706,7 @@ var App={
             var fy=y+19,colW=(w-20)/3,gap=5;
             summaryFields.forEach(function(item,i){kv(item[0],item[1],x+5+(i%3)*(colW+gap),fy+Math.floor(i/3)*12,colW)});
             fy+=summaryRows?summaryRows*12+4:0;
-            doc.setFont('helvetica','bold');doc.setFontSize(7.2);doc.setTextColor(100,116,139);doc.text('READOUT',x+5,fy,{baseline:'top'});fy+=lh(7.2);
+            doc.setFont('helvetica','bold');doc.setFontSize(7.2);doc.setTextColor(100,116,139);doc.text(settings.outputStyle==='quick'?'QUICK LIST':'READOUT',x+5,fy,{baseline:'top'});fy+=lh(7.2);
             doc.setFont('helvetica','normal');doc.setFontSize(9.4);doc.setTextColor(17,24,39);
             var remaining=bottom-fy-8;
             if(narrLines.length*lh(9.4)>remaining){doc.text(narrLines.slice(0,Math.max(1,Math.floor(remaining/lh(9.4)))),x+5,fy,{baseline:'top'});doc.addPage();y=mT;doc.text(narrLines.slice(Math.max(1,Math.floor(remaining/lh(9.4)))),x,y,{baseline:'top'});y+=narrLines.slice(Math.max(1,Math.floor(remaining/lh(9.4)))).length*lh(9.4)+8}
