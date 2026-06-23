@@ -753,6 +753,8 @@
             <div class="fg" style="margin-bottom:14px">
                 <div class="fi"><label>PDF Title</label><input type="text" id="prepPdfTitle" placeholder="Huddle Prep Notes"></div>
                 <div class="fi"><label>Download As</label><input type="text" id="prepPdfFileName" placeholder="huddle-prep-notes.pdf"></div>
+                <div class="fi"><label>Prep Date</label><input type="date" id="prepDate" onchange="App.loadPrepForDate(this.value)"></div>
+                <div class="fi"><label>Previous Prep</label><select id="prepHistoryPicker" onchange="App.loadPrepForDate(this.value)"><option value="">Current date</option></select></div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
                 <button class="btn" onclick="App.showHuddlePrepMapModal()">Map Prep Fields</button>
@@ -1476,7 +1478,7 @@ var CP={};CALL_TYPES.forEach(function(t,i){CP[t]=i});
 var TIER_ORDER={Gold:0,Silver:1,Bronze:2,Copper:3,Steel:4};
 var HUDDLE_ID_COLS=['Huddle Member ID','Huddle Name','Huddle PCP','Huddle Case Manager','Huddle Tier'];
 var HUDDLE_COLS=['Huddle Status','Times Discussed','Last Discussed','Huddle Notes'];
-var HUDDLE_PREP_COLS=['Prep Age','Prep Sex','Prep Plan','Prep Last HRA Date','Prep HRA Due Date','Prep Primary Provider','Prep Attributed Provider','Prep History','Prep Care Plan','Prep Missed Appointments 12M','Prep Most Recent Appointment','Prep ER Visits 12M','Prep IP Admissions 12M','Prep Most Recent ER/IP','Prep Recent Authorizations','Prep Appointments','Prep Admissions','Prep Assigned Tasks','Prep Custom Rows','Prep Last Readout','Prep Last Prepared Date','Prep Notes'];
+var HUDDLE_PREP_COLS=['Prep Age','Prep Sex','Prep Plan','Prep Last HRA Date','Prep HRA Due Date','Prep Primary Provider','Prep Attributed Provider','Prep History','Prep Care Plan','Prep Missed Appointments 12M','Prep Most Recent Appointment','Prep ER Visits 12M','Prep IP Admissions 12M','Prep Most Recent ER/IP','Prep Recent Authorizations','Prep Appointments','Prep Admissions','Prep Assigned Tasks','Prep Custom Rows','Prep Date','Prep Date History','Prep Last Readout','Prep Last Prepared Date','Prep Notes'];
 var MEMBER_COL_DEFAULTS=['ID','Member ID','Name','PCP','Case Manager','Tier','Call Type','Next Call','Review During Daily','Daily Review Until','active','hintTitle','hintLabel','hint','noteMemberID','noteTimestamp','note'];
 function normHeader(h){return String(h||'').trim().toLowerCase().replace(/\s+/g,' ')}
 function isHuddleCol(h){var n=normHeader(h);return n.indexOf('prep ')===0||n==='huddle member id'||n==='huddle name'||n==='huddle pcp'||n==='huddle case manager'||n==='huddle tier'||n==='huddle status'||n==='times discussed'||n==='last discussed'||n==='huddle notes'}
@@ -3538,7 +3540,40 @@ var App={
     },
     prepField:function(id){var el=document.getElementById(id);return el?el.value.trim():''},
     prepToday:function(){return new Date().toISOString().slice(0,10)},
+    prepCurrentDate:function(){return this.prepField('prepDate')||this.prepToday()},
     prepCurrentMember:function(){return this.huddlePrepRows[this.huddlePrepIndex]},
+    prepHistory:function(m){return this.prepJson(m,'Prep Date History').filter(function(x){return x&&x.date}).sort(function(a,b){return String(b.date).localeCompare(String(a.date))})},
+    setPrepHistory:function(m,entry){
+        var rows=this.prepHistory(m).filter(function(x){return x.date!==entry.date});
+        rows.unshift(entry);
+        this.prepSetJson(m,'Prep Date History',rows);
+    },
+    renderPrepHistoryPicker:function(m){
+        var picker=document.getElementById('prepHistoryPicker'),dateEl=document.getElementById('prepDate'),history=this.prepHistory(m),current=dateEl&&dateEl.value?dateEl.value:this.prepToday(),self=this;
+        if(dateEl&&!dateEl.value)dateEl.value=current;
+        if(!picker)return;
+        picker.innerHTML='<option value="">Current date</option>'+history.map(function(h){return '<option value="'+self.esc(h.date)+'" '+(h.date===current?'selected':'')+'>'+self.esc(h.date)+' - '+self.prepCustomRowLines((h.data&&h.data.customRows)||h.customRows||[]).length+' lines</option>'}).join('');
+    },
+    applyPrepDataToForm:function(data){
+        data=data||{};
+        var map=[['prepAge','age'],['prepSex','sex'],['prepPlan','plan'],['prepLastHra','lastHra'],['prepHraDue','hraDue'],['prepPrimaryProvider','primary'],['prepAttributedProvider','attributed'],['prepHistory','history'],['prepCarePlan','carePlan'],['prepMissedAppts','missed'],['prepMostRecentAppt','recentAppt'],['prepErVisits','er'],['prepIpAdmissions','ip'],['prepMostRecentUtil','recentUtil'],['prepAssignedTasks','tasks']];
+        map.forEach(function(pair){var el=document.getElementById(pair[0]);if(el)el.value=data[pair[1]]||''});
+        this.renderPrepAuthRows(data.auths||[]);
+        this.renderPrepAppointmentRows(data.appts||[]);
+        this.renderPrepAdmissionRows(data.admissions||[]);
+        this.renderPrepCustomRows((data.customRows&&data.customRows.length)?data.customRows:[{text:''}]);
+        this.updatePrepPreview();
+    },
+    loadPrepForDate:function(date){
+        var m=this.prepCurrentMember();if(!m)return;
+        date=date||this.prepToday();
+        var dateEl=document.getElementById('prepDate');if(dateEl)dateEl.value=date;
+        var found=this.prepHistory(m).find(function(h){return h.date===date});
+        if(found&&found.data)this.applyPrepDataToForm(found.data);
+        else if(found)this.renderPrepCustomRows(found.customRows||[]);
+        else this.applyPrepDataToForm({customRows:[{text:''}]});
+        this.renderPrepHistoryPicker(m);
+    },
     renderPrepFilterOptions:function(){
         var rows=this.huddlePrepRows||[],cmEl=document.getElementById('prepFilterCM'),provEl=document.getElementById('prepFilterProvider'),fieldEl=document.getElementById('prepFilterField'),self=this;
         if(!cmEl||!provEl||!fieldEl)return;
@@ -3582,6 +3617,7 @@ var App={
         if(!m){document.getElementById('prepFormWrap').style.display='none';return}
         document.getElementById('prepFormWrap').style.display='';
         document.getElementById('prepPatientTitle').textContent=(this.hName(m)||'Unnamed')+' - '+(this.hMemberId(m)||'No ID');
+        var dateEl=document.getElementById('prepDate');if(dateEl&&!dateEl.value)dateEl.value=this.prepToday();
         [
             ['prepAge','Prep Age'],['prepSex','Prep Sex'],['prepPlan','Prep Plan'],['prepLastHra','Prep Last HRA Date'],['prepHraDue','Prep HRA Due Date'],
             ['prepPrimaryProvider','Prep Primary Provider'],['prepAttributedProvider','Prep Attributed Provider'],['prepHistory','Prep History'],['prepCarePlan','Prep Care Plan'],
@@ -3592,6 +3628,11 @@ var App={
         this.renderPrepAppointmentRows();
         this.renderPrepAdmissionRows();
         this.renderPrepCustomRows();
+        this.renderPrepHistoryPicker(m);
+        var selectedDate=this.prepCurrentDate(),historyMatch=this.prepHistory(m).find(function(h){return h.date===selectedDate});
+        if(historyMatch&&historyMatch.data)this.applyPrepDataToForm(historyMatch.data);
+        else if(historyMatch)this.renderPrepCustomRows(historyMatch.customRows||[]);
+        else if(selectedDate!==this.prepToday())this.applyPrepDataToForm({customRows:[{text:''}]});
         this.updatePrepPreview();
     },
     pickPrepPatient:function(i){this.saveCurrentHuddlePrep(true);this.huddlePrepIndex=i;this.renderHuddlePrep()},
@@ -3618,6 +3659,7 @@ var App={
     },
     saveCurrentHuddlePrep:function(silent){
         var m=this.prepCurrentMember();if(!m)return;
+        var prepDate=this.prepCurrentDate();
         [
             ['Prep Age','prepAge'],['Prep Sex','prepSex'],['Prep Plan','prepPlan'],['Prep Last HRA Date','prepLastHra'],['Prep HRA Due Date','prepHraDue'],
             ['Prep Primary Provider','prepPrimaryProvider'],['Prep Attributed Provider','prepAttributedProvider'],['Prep History','prepHistory'],['Prep Care Plan','prepCarePlan'],
@@ -3629,8 +3671,12 @@ var App={
         this.prepSetJson(m,'Prep Admissions',this.readPrepRows('admit'));
         this.prepSetJson(m,'Prep Custom Rows',this.readPrepRows('custom').filter(function(r){return String(r.text||'').trim()}));
         var settings=this.saveHuddlePrepSettings();
-        this.setHval(m,'Prep Last Readout',this.buildPrepOutput(m,this.prepFormData(m),settings));
-        this.setHval(m,'Prep Last Prepared Date',this.prepToday());
+        var data=this.prepFormData(m),readout=this.buildPrepOutput(m,data,settings);
+        this.setHval(m,'Prep Date',prepDate);
+        this.setHval(m,'Prep Last Readout',readout);
+        this.setHval(m,'Prep Last Prepared Date',prepDate);
+        this.setPrepHistory(m,{date:prepDate,savedAt:new Date().toISOString(),mode:settings.mode||'lines',readout:readout,data:data,customRows:data.customRows||[]});
+        this.renderPrepHistoryPicker(m);
         this.writeMemberCSV();this.renderHuddle();if(!silent)this.toast('Prep saved','success');
     },
     renderPrepAuthRows:function(rows){
@@ -3671,7 +3717,7 @@ var App={
     removePrepCustomRow:function(i){var m=this.prepCurrentMember();if(!m)return;var rows=this.readPrepRows('custom');rows.splice(i,1);this.renderPrepCustomRows(rows.length?rows:[{text:''}]);this.updatePrepPreview()},
     prepFormData:function(m){
         return {
-            name:this.hName(m)||'the member',id:this.hMemberId(m),sex:this.prepField('prepSex')||this.hval(m,'Prep Sex'),age:this.prepAgeFromDOB(this.prepField('prepAge')||this.hval(m,'Prep Age')),plan:this.prepField('prepPlan')||this.hval(m,'Prep Plan'),
+            date:this.prepCurrentDate(),name:this.hName(m)||'the member',id:this.hMemberId(m),sex:this.prepField('prepSex')||this.hval(m,'Prep Sex'),age:this.prepAgeFromDOB(this.prepField('prepAge')||this.hval(m,'Prep Age')),plan:this.prepField('prepPlan')||this.hval(m,'Prep Plan'),
             lastHra:this.prepField('prepLastHra')||this.hval(m,'Prep Last HRA Date'),hraDue:this.prepField('prepHraDue')||this.hval(m,'Prep HRA Due Date'),
             primary:this.prepField('prepPrimaryProvider')||this.hval(m,'Prep Primary Provider')||this.pcpOf(m),attributed:this.prepField('prepAttributedProvider')||this.hval(m,'Prep Attributed Provider'),
             history:this.prepField('prepHistory')||this.hval(m,'Prep History'),carePlan:this.prepField('prepCarePlan')||this.hval(m,'Prep Care Plan')||this.hval(m,'Huddle Notes'),
