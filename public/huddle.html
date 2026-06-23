@@ -835,7 +835,7 @@
                         <h3>Assigned Tasks</h3>
                         <textarea id="prepAssignedTasks" rows="3" oninput="App.updatePrepPreview()" style="width:100%;padding:10px 12px;font-family:var(--font);font-size:14px;background:var(--bg-2);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);resize:vertical"></textarea>
                     </div>
-                    <div class="prep-section">
+                    <div class="prep-section prep-readout-section">
                         <h3>Generated Readout</h3>
                         <div class="prep-narrative" id="prepNarrative"></div>
                     </div>
@@ -3533,6 +3533,7 @@ var App={
         ['Lines','Details','Setup'].forEach(function(name){var btn=document.getElementById('prepMode'+name+'Btn');if(btn)btn.classList.toggle('active',name.toLowerCase()===mode)});
         document.querySelectorAll('.prep-settings-section').forEach(function(el){el.style.display=mode==='setup'?'':'none'});
         document.querySelectorAll('.prep-detail-fields,.prep-detail-section').forEach(function(el){el.style.display=mode==='details'?'':'none'});
+        document.querySelectorAll('.prep-readout-section').forEach(function(el){el.style.display=mode==='lines'?'none':''});
         this.updatePrepPreview();
     },
     prepField:function(id){var el=document.getElementById(id);return el?el.value.trim():''},
@@ -3651,7 +3652,7 @@ var App={
         }).join('');
     },
     renderPrepCustomRows:function(rows){
-        var saved=this.prepCustomRowLines(rows||this.prepJson(this.prepCurrentMember(),'Prep Custom Rows')).map(function(text){return {text:text}});
+        var saved=rows?rows.map(function(r){return {text:String((r||{}).text||'')}}):this.prepCustomRowLines(this.prepJson(this.prepCurrentMember(),'Prep Custom Rows')).map(function(text){return {text:text}});
         var list=saved.length?saved:[{text:''}],self=this,wrap=document.getElementById('prepCustomRows');
         if(!wrap)return;
         wrap.innerHTML=list.map(function(r,i){
