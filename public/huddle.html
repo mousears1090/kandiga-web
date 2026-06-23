@@ -3916,7 +3916,36 @@ var App={
             var cleanCustom=self.prepCustomRows(d.customRows||[]),lineRows=lineMode?cleanCustom:[],narrLines=lineMode?[]:lines(narr,w-10,9.4),summaryRows=Math.ceil(summaryFields.length/3);
             if(lineMode&&!lineRows.length)lineRows=[{text:'No lines yet.',sub:false}];
             var lineLayouts=lineRows.map(function(row,i){var mark=self.prepLineMarker(row,i,settings),textW=w-(row.sub?34:(mark?24:16)),wrapped=lines(row.text,textW,8.8),rowH=Math.max(10,wrapped.length*lh(8.8)+5);return {row:row,mark:mark,textW:textW,wrapped:wrapped,h:rowH}});
-            var lineTableH=lineLayouts.length?lineLayouts.reduce(function(sum,r){return sum+r.h},2):12,cardH=24+summaryRows*12+(lineMode?lineTableH:narrLines.length*lh(9.4))+12;
+            if(lineMode){
+                var remainingLayouts=lineLayouts.slice(),firstSegment=true;
+                while(remainingLayouts.length){
+                    var segment=[],used=0,segmentY=firstSegment?y:mT,available=bottom-segmentY-27;
+                    while(remainingLayouts.length&&(segment.length===0||used+remainingLayouts[0].h<=available)){var nextLayout=remainingLayouts.shift();segment.push(nextLayout);used+=nextLayout.h}
+                    var continued=!firstSegment;
+                    if(firstSegment&&segmentY+19+used+8>bottom){doc.addPage();segmentY=mT;available=bottom-segmentY-27;continued=false}
+                    else if(!firstSegment){doc.addPage()}
+                    y=segmentY;
+                    var segH=19+used+8;
+                    doc.setDrawColor(203,213,225);doc.setFillColor(255,255,255);doc.roundedRect(x,y,w,Math.min(segH,bottom-y),2,2,'FD');
+                    doc.setFillColor(237,248,244);doc.roundedRect(x,y,w,14,2,2,'F');
+                    doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(17,24,39);doc.text(title+(continued?' (continued)':''),x+5,y+3.2,{baseline:'top'});
+                    doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(71,85,105);doc.text(lines(sub,w-80,8).slice(0,1),x+5,y+9,{baseline:'top'});
+                    doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(13,147,115);doc.text((idx+1)+' / '+rows.length,x+w-8,y+7,{align:'right',baseline:'middle'});
+                    var lineY=y+19;
+                    segment.forEach(function(layout,i){
+                        var row=layout.row,textX=x+(row.sub?26:(layout.mark?18:10));
+                        doc.setDrawColor(226,232,240);doc.setFillColor(row.title?241:(row.sub?251:(i%2?255:248)),row.title?245:(row.sub?252:(i%2?255:250)),row.title?249:(row.sub?253:(i%2?255:252)));doc.rect(x+5,lineY,w-10,layout.h,'FD');
+                        doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(100,116,139);if(layout.mark)doc.text(layout.mark,x+9,lineY+Math.min(5,layout.h/2),{baseline:'middle'});
+                        doc.setFont('helvetica',(row.bold||row.title)?'bold':'normal');doc.setFontSize(row.title?9.2:8.8);doc.setTextColor(17,24,39);doc.text(layout.wrapped,textX,lineY+2.4,{baseline:'top'});
+                        lineY+=layout.h;
+                    });
+                    y=lineY+8;
+                    firstSegment=false;
+                }
+                y+=4;
+                return;
+            }
+            var cardH=24+summaryRows*12+narrLines.length*lh(9.4)+12;
             ensure(Math.min(cardH,90));
             doc.setDrawColor(203,213,225);doc.setFillColor(255,255,255);doc.roundedRect(x,y,w,Math.min(cardH,bottom-y),2,2,'FD');
             doc.setFillColor(237,248,244);doc.roundedRect(x,y,w,14,2,2,'F');
