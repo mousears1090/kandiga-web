@@ -1553,7 +1553,8 @@ var App={
     },
 
     writeMemberCSV:function(){
-        if(this.xlMode){this.writeExcelMembers();return Promise.resolve()}
+        this.normalizeAllDates();
+        if(this.xlMode){return this.writeExcelMembers()}
         if(!this.mHandle)return Promise.resolve();
         // Ensure hint columns exist if needed
         var needHints=this.members.some(function(m){return m.hintTitle||m.hintValue});
@@ -1583,9 +1584,9 @@ var App={
             csv+=vals.map(csvF).join(',')+'\n';
         });
         var handle=this.mHandle;
-        return handle.createWritable().then(function(w){return w.write(csv).then(function(){return w.close()})});
+        return handle.createWritable().then(function(w){return w.write(csv).then(function(){return w.close()})}).then(function(){self.confirmSaved('CSV saved')}).catch(function(e){self.toast('Save failed: '+(e&&e.message?e.message:e),'danger');throw e});
     },
-    writeNoteCSV:function(){if(this.xlMode){this.writeExcelNotes();return Promise.resolve()}return this.writeMemberCSV()},
+    writeNoteCSV:function(){if(this.xlMode)return this.writeExcelNotes();return this.writeMemberCSV()},
 
     showErr:function(msg){
         var el=document.getElementById('setupErr');
@@ -1635,7 +1636,7 @@ var App={
         if(n==='hint')return m.hintValue||'';
         return x[h]||'';
     },
-    setExtraVal:function(m,h,v){if(!m.extra)m.extra={};m.extra[h]=v==null?'':String(v)},
+    setExtraVal:function(m,h,v){if(!m.extra)m.extra={};m.extra[h]=this.normalizeFieldValue(h,v)},
     buildCSVLayout:function(){
         var mh=[],hh=[],self=this,hset={};
         (this.huddleHeaders||[]).forEach(function(h){if(h)hset[h]=true});
@@ -1679,7 +1680,7 @@ var App={
         this.members=[];this.notes=[];var self=this;
         data.forEach(function(r){if(!r.some(function(x){return x.trim()}))return;
             var rowObj={};
-            headers.forEach(function(h,i){if(h)rowObj[h]=(r[i]||'').trim()});
+            headers.forEach(function(h,i){if(h)rowObj[h]=self.normalizeFieldValue(h,(r[i]||'').trim())});
             var id=firstVal(rowObj,['ID'])||(r[0]||'').trim();
             var memberId=firstVal(rowObj,['Member ID','memberId','MemberID'])||(r[1]||'').trim();
             var hasHuddleData=HUDDLE_ID_COLS.concat(HUDDLE_COLS).concat(HUDDLE_PREP_COLS).some(function(h){return rowObj[h]&&String(rowObj[h]).trim()});
@@ -1694,7 +1695,7 @@ var App={
                 var m={id:id||String(self.nextMid++),memberId:memberId,
                     name:firstVal(rowObj,['Name','Member Name','Patient Name'])||(r[2]||'').trim(),
                     tier:firstVal(rowObj,['Tier','Metal Tier'])||(r[3]||'').trim(),
-                    nextCall:firstVal(rowObj,['Next Call','NextCall'])||(r[4]||'').trim(),
+                    nextCall:self.normalizeDate(firstVal(rowObj,['Next Call','NextCall'])||(r[4]||'').trim()),
                     callType:firstVal(rowObj,['Call Type','CallType'])||(r[5]||'').trim(),
                     cm:firstVal(rowObj,['Case Manager','CM','Care Manager'])||(r[6]||'').trim()};
                 var activeVal=self.activeCol>=0?(r[self.activeCol]||'').trim().toLowerCase():'';
@@ -1703,10 +1704,11 @@ var App={
                 m.hintLabel=(self.hintLabelCol>=0?(r[self.hintLabelCol]||'').trim():'');
                 m.hintValue=(self.hintCol>=0?(r[self.hintCol]||'').trim():'');
                 m.extra={};
-                headers.forEach(function(h,i){if(h)m.extra[h]=(r[i]||'').trim()});
+                headers.forEach(function(h,i){if(h)m.extra[h]=self.normalizeFieldValue(h,(r[i]||'').trim())});
                 self.members.push(m);
             }
         });
+        this.normalizeAllDates();
         var mx=0;this.members.forEach(function(m){var n=parseInt(m.id);if(!isNaN(n)&&n>mx)mx=n});this.nextMid=mx+1;
         var nmx=0;this.notes.forEach(function(n){var v=parseInt(n.id);if(!isNaN(v)&&v>nmx)nmx=v});this.nextNid=nmx+1;
     },
@@ -1715,6 +1717,7 @@ var App={
         var today=new Date().toISOString().split('T')[0];
         var changed=false;
         this.members.forEach(function(m){
+            m.nextCall=App.normalizeDate(m.nextCall);
             if(m.nextCall&&m.nextCall<today){m.nextCall=today;changed=true}
         });
         if(changed)this.writeMemberCSV();
@@ -1725,13 +1728,14 @@ var App={
     addMember:function(data){
         data.id=String(this.nextMid++);
         data.active=true;
+        this.normalizeMemberDates(data);
         this.members.push(data);
         this.writeMemberCSV();
         this.render();this.toast('Member added & saved','success');
     },
     updateMember:function(id,data){
         var i=this.members.findIndex(function(m){return m.id===id});
-        if(i!==-1){this.members[i]=Object.assign({},this.members[i],data);this.writeMemberCSV();this.render();this.toast('Updated & saved','success')}
+        if(i!==-1){this.members[i]=Object.assign({},this.members[i],data);this.normalizeMemberDates(this.members[i]);this.writeMemberCSV();this.render();this.toast('Updated & saved','success')}
     },
     deactivateMember:function(id){
         var m=this.members.find(function(x){return x.id===id});
@@ -1855,9 +1859,11 @@ var App={
         var vals={},self=this;
         this.getFilteredBase().forEach(function(m){
             var v=self.getSortVal(m,key);
+            if(self.isDateField(key))v=self.normalizeDate(v);
             if(v!==''&&v!=null)vals[String(v)]=true;
         });
         return Object.keys(vals).sort(function(a,b){
+            if(self.isDateField(key))return self.compareDateValues(a,b,'asc');
             if(key==='callType')return(CP[a]!=null?CP[a]:9999)-(CP[b]!=null?CP[b]:9999)||a.localeCompare(b);
             if(key==='tier')return(TIER_ORDER[a]!=null?TIER_ORDER[a]:9999)-(TIER_ORDER[b]!=null?TIER_ORDER[b]:9999)||a.localeCompare(b);
             return a.localeCompare(b);
@@ -1943,6 +1949,8 @@ var App={
             var ak=String(av).trim().toLowerCase(),bk=String(bv).trim().toLowerCase();
             var ai=customMap[ak]!=null?customMap[ak]:9999,bi=customMap[bk]!=null?customMap[bk]:9999;
             if(ai!==bi)return ai-bi;
+        }else if(this.isDateField(key)){
+            return this.compareDateValues(av,bv,dir);
         }else if(key==='callType'){
             av=CP[av]!=null?CP[av]:9999;bv=CP[bv]!=null?CP[bv]:9999;
         }else if(key==='tier'){
@@ -2130,8 +2138,8 @@ var App={
         if(tier)list=list.filter(function(m){return m.tier===tier});
         if(this.reviewOnly)list=list.filter(function(m){return App.isDailyReviewActive(m)});
         var dateKey=App.xlMode?'dcDate':'nextCall';
-        if(df)list=list.filter(function(m){return (m[dateKey]||'')>=df});
-        if(dt)list=list.filter(function(m){return (m[dateKey]||'')<=dt});
+        if(df)list=list.filter(function(m){return App.dateSortKey(m[dateKey])>=df});
+        if(dt)list=list.filter(function(m){return App.dateSortKey(m[dateKey])<=dt});
         return list;
     },
     filtered:function(){
@@ -2151,7 +2159,7 @@ var App={
         }else if(!this.manualSort){
             // Default: date ascending first, then call type priority
             list.sort(function(a,b){
-                var da=a.nextCall||'9999',db=b.nextCall||'9999';
+                var da=App.dateSortKey(a.nextCall),db=App.dateSortKey(b.nextCall);
                 if(da<db)return -1;if(da>db)return 1;
                 var ca=CP[a.callType]!=null?CP[a.callType]:99;
                 var cb=CP[b.callType]!=null?CP[b.callType]:99;
@@ -2164,6 +2172,7 @@ var App={
                 if(col==='id'){av=parseInt(a.id)||0;bv=parseInt(b.id)||0}
                 else if(col==='callType'){av=CP[a.callType]!=null?CP[a.callType]:99;bv=CP[b.callType]!=null?CP[b.callType]:99}
                 else if(col==='tier'){av=TIER_ORDER[a.tier]!=null?TIER_ORDER[a.tier]:99;bv=TIER_ORDER[b.tier]!=null?TIER_ORDER[b.tier]:99}
+                else if(App.isDateField(col)){return App.compareDateValues(a[col],b[col],App.sortDir)}
                 else{av=(a[col]||'').toLowerCase();bv=(b[col]||'').toLowerCase()}
                 return av<bv?-dir:av>bv?dir:0;
             });
@@ -2257,6 +2266,66 @@ var App={
     esc:function(s){if(s==null)return'';var d=document.createElement('div');d.textContent=String(s);return d.innerHTML},
     jsArg:function(s){return JSON.stringify(String(s==null?'':s))},
     fmtTime:function(iso){try{var d=new Date(iso);return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+' at '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}catch(e){return iso}},
+    todayISO:function(){return new Date().toISOString().split('T')[0]},
+    pad2:function(n){return String(n).padStart(2,'0')},
+    dateOnly:function(y,m,d){
+        y=parseInt(y,10);m=parseInt(m,10);d=parseInt(d,10);
+        if(!y||!m||!d||m<1||m>12||d<1||d>31)return'';
+        var dt=new Date(y,m-1,d);
+        if(dt.getFullYear()!==y||dt.getMonth()!==m-1||dt.getDate()!==d)return'';
+        return y+'-'+this.pad2(m)+'-'+this.pad2(d);
+    },
+    isDateField:function(field){
+        var n=normHeader(field);
+        return n==='dob'||n.indexOf('date')>-1||n.indexOf('next call')>-1||n.indexOf('last discussed')>-1||n.indexOf('most recent appointment')>-1||n.indexOf('daily review until')>-1;
+    },
+    normalizeDate:function(value){
+        if(value==null||value==='')return'';
+        if(value instanceof Date&&!isNaN(value))return this.dateOnly(value.getFullYear(),value.getMonth()+1,value.getDate());
+        if(typeof value==='number'&&isFinite(value)){
+            var serial=new Date(Math.round((value-25569)*86400000));
+            return isNaN(serial)?'':serial.toISOString().split('T')[0];
+        }
+        var s=String(value).trim();if(!s)return'';
+        var m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
+        if(m)return this.dateOnly(m[1],m[2],m[3])||s;
+        m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+        if(m){
+            var y=parseInt(m[3],10);if(y<100)y+=y>=70?1900:2000;
+            return this.dateOnly(y,m[1],m[2])||s;
+        }
+        if(/^\d{5}(?:\.\d+)?$/.test(s)){
+            var n=parseFloat(s);
+            if(n>20000&&n<80000)return this.normalizeDate(n);
+        }
+        var d=new Date(s);
+        return isNaN(d)?s:this.dateOnly(d.getFullYear(),d.getMonth()+1,d.getDate());
+    },
+    normalizeFieldValue:function(field,value){
+        var v=value==null?'':String(value).trim();
+        return this.isDateField(field)?this.normalizeDate(v):v;
+    },
+    normalizeMemberDates:function(m){
+        if(!m)return;
+        ['nextCall','admitDate','dcDate','tocApptDate','dob'].forEach(function(k){if(m[k])m[k]=App.normalizeDate(m[k])});
+        Object.keys(m.extra||{}).forEach(function(h){if(App.isDateField(h))m.extra[h]=App.normalizeDate(m.extra[h])});
+    },
+    normalizeAllDates:function(){(this.members||[]).forEach(function(m){App.normalizeMemberDates(m)})},
+    dateSortKey:function(value){
+        var iso=this.normalizeDate(value);
+        return /^\d{4}-\d{2}-\d{2}$/.test(iso)?iso:'9999-12-31';
+    },
+    compareDateValues:function(a,b,dir){
+        var av=this.dateSortKey(a),bv=this.dateSortKey(b);
+        if(av<bv)return dir==='desc'?1:-1;
+        if(av>bv)return dir==='desc'?-1:1;
+        return 0;
+    },
+    confirmSaved:function(label){
+        this.lastSavedAt=new Date();
+        var time=this.lastSavedAt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',second:'2-digit'});
+        this.toast((label||'Saved')+' at '+time,'success');
+    },
     rowClick:function(e,id){if(e.target.closest('button'))return;this.showNotesModal(id)},
     lockScroll:function(){document.body.classList.add('no-scroll')},
     unlockScroll:function(){document.body.classList.remove('no-scroll')},
@@ -2284,7 +2353,7 @@ var App={
         if(!name){this.toast('Name required','danger');return false}
         if(!ct){this.toast('Select call type','danger');return false}
         var cm=document.getElementById('fCM').value.trim();
-        var data={memberId:memberId,name:name,tier:tier,callType:ct,nextCall:document.getElementById('fNextCall').value,cm:cm};
+        var data={memberId:memberId,name:name,tier:tier,callType:ct,nextCall:this.normalizeDate(document.getElementById('fNextCall').value),cm:cm};
         if(this.editId)this.updateMember(this.editId,data);else this.addMember(data);
         this.hideMemberModal();return false;
     },
@@ -2336,11 +2405,11 @@ var App={
         var ct=document.getElementById('nfCallType').value;
         var data={callType:ct};
         if(this.xlMode){
-            data.admitDate=document.getElementById('nfAdmitDate').value;
-            data.dcDate=document.getElementById('nfDCDate').value;
+            data.admitDate=this.normalizeDate(document.getElementById('nfAdmitDate').value);
+            data.dcDate=this.normalizeDate(document.getElementById('nfDCDate').value);
             data.nextCall=data.dcDate;
         }else{
-            data.nextCall=document.getElementById('nfNextCall').value;
+            data.nextCall=this.normalizeDate(document.getElementById('nfNextCall').value);
         }
         this.updateMember(m.id,data);
     },
@@ -2699,7 +2768,7 @@ var App={
         filteredRows.forEach(function(row){
             var mid=midIdx>=0?(row[midIdx]||'').trim():'';
             var sourceExtra={};
-            (self.importCols||[]).forEach(function(h,i){if(h&&!isHuddleCol(h))sourceExtra[h]=(row[i]||'').trim()});
+            (self.importCols||[]).forEach(function(h,i){if(h&&!isHuddleCol(h))sourceExtra[h]=self.normalizeFieldValue(h,(row[i]||'').trim())});
             var name='';
             if(nameFmt==='split'){
                 var last=lastIdx>=0?(row[lastIdx]||'').trim():'';
@@ -2721,7 +2790,7 @@ var App={
                 ex.extra=Object.assign({},ex.extra||{},sourceExtra);
                 ex.active=true; // Auto-activate on import
                 if(!self.isFieldProtected(ex,'tier'))ex.tier=tier||ex.tier;
-                if(!self.isFieldProtected(ex,'nextCall'))ex.nextCall=nextCall;
+                if(!self.isFieldProtected(ex,'nextCall'))ex.nextCall=self.normalizeDate(nextCall);
                 if(!self.isFieldProtected(ex,'callType'))ex.callType=ct;
                 if(!self.isFieldProtected(ex,'cm'))ex.cm=cm||ex.cm;
                 if(name)ex.name=name;
@@ -2732,7 +2801,7 @@ var App={
                 memberId:mid,
                 name:name,
                 tier:tier||'',
-                nextCall:nextCall,
+                nextCall:self.normalizeDate(nextCall),
                 callType:ct,
                 cm:cm||'',
                 active:true,
@@ -2778,7 +2847,7 @@ var App={
             if(s==='pcp')return App.pcpOf(a).localeCompare(App.pcpOf(b))||App.hName(a).localeCompare(App.hName(b));
             if(s==='cm')return App.hCM(a).localeCompare(App.hCM(b))||App.hName(a).localeCompare(App.hName(b));
             if(s==='times')return (parseInt(App.hval(a,'Times Discussed')||'0',10)-parseInt(App.hval(b,'Times Discussed')||'0',10))||App.hName(a).localeCompare(App.hName(b));
-            return (App.hval(a,'Last Discussed')||'0000').localeCompare(App.hval(b,'Last Discussed')||'0000')||App.hName(a).localeCompare(App.hName(b));
+            return App.compareDateValues(App.hval(a,'Last Discussed'),App.hval(b,'Last Discussed'),'asc')||App.hName(a).localeCompare(App.hName(b));
         });
         return rows;
     },
@@ -2881,8 +2950,7 @@ var App={
     huddleCandidateSort:function(list){
         return list.slice().sort(function(a,b){
             var ta=parseInt(App.hval(a,'Times Discussed')||'0',10),tb=parseInt(App.hval(b,'Times Discussed')||'0',10);
-            var la=App.hval(a,'Last Discussed')||'0000',lb=App.hval(b,'Last Discussed')||'0000';
-            return ta-tb||la.localeCompare(lb)||App.hName(a).localeCompare(App.hName(b));
+            return ta-tb||App.compareDateValues(App.hval(a,'Last Discussed'),App.hval(b,'Last Discussed'),'asc')||App.hName(a).localeCompare(App.hName(b));
         });
     },
     getHuddleGenerateSettings:function(){try{return JSON.parse(localStorage.getItem('mm_huddle_generate')||'{}')}catch(e){return{}}},
@@ -3267,7 +3335,7 @@ var App={
             if(sortBy==='pcp')return App.pcpOf(a).localeCompare(App.pcpOf(b))||App.hName(a).localeCompare(App.hName(b));
             if(sortBy==='cm')return App.hCM(a).localeCompare(App.hCM(b))||App.hName(a).localeCompare(App.hName(b));
             if(sortBy==='times')return (parseInt(App.hval(a,'Times Discussed')||'0',10)-parseInt(App.hval(b,'Times Discussed')||'0',10))||App.hName(a).localeCompare(App.hName(b));
-            return (App.hval(a,'Last Discussed')||'0000').localeCompare(App.hval(b,'Last Discussed')||'0000')||App.hName(a).localeCompare(App.hName(b));
+            return App.compareDateValues(App.hval(a,'Last Discussed'),App.hval(b,'Last Discussed'),'asc')||App.hName(a).localeCompare(App.hName(b));
         });
     },
     updateHuddlePDFPreview:function(){
@@ -4684,25 +4752,19 @@ var App={
         this.render();
     },
     xlParseDate:function(val){
-        if(!val)return'';
-        if(typeof val==='number'){// Excel date serial
-            var d=new Date((val-25569)*86400000);
-            return d.toISOString().split('T')[0];
-        }
-        var s=String(val).trim();
-        if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.substring(0,10);
-        var d=new Date(s);
-        return isNaN(d)?s:d.toISOString().split('T')[0];
+        return this.normalizeDate(val);
     },
     saveExcelFile:function(){
         if(!this.excelHandle||!this.excelWb)return Promise.resolve();
         var buf=XLSX.write(this.excelWb,{bookType:'xlsx',type:'array'});
+        var self=this;
         return this.excelHandle.createWritable().then(function(w){
             return w.write(new Blob([buf],{type:'application/octet-stream'})).then(function(){return w.close()});
-        });
+        }).then(function(){self.confirmSaved('Excel saved')}).catch(function(e){self.toast('Save failed: '+(e&&e.message?e.message:e),'danger');throw e});
     },
     writeExcelMembers:function(){
-        if(!this.xlMode||!this.excelWb)return;
+        if(!this.xlMode||!this.excelWb)return Promise.resolve();
+        this.normalizeAllDates();
         var map=this.xlMap||this.getXlMap();
         var ws=this.excelWb.Sheets[this.excelWb.SheetNames[map.memberSheet]];
         var cols=map.cols;var self=this;
@@ -4718,20 +4780,21 @@ var App={
             xlSet(cols.tocApptDate,m.tocApptDate);
             xlSet(cols.active,m.active===false?'false':'true');
         });
-        this.saveExcelFile();
+        return this.saveExcelFile();
     },
     writeExcelNotes:function(){
-        if(!this.xlMode||!this.excelWb)return;
+        if(!this.xlMode||!this.excelWb)return Promise.resolve();
         var map=this.xlMap||this.getXlMap();
-        if(map.noteSheet<0)return;
+        if(map.noteSheet<0)return Promise.resolve();
         var aoa=[['Member ID','Timestamp','Note']];
         this.notes.forEach(function(n){aoa.push([n.memberId,n.ts,n.note])});
         var nws=XLSX.utils.aoa_to_sheet(aoa);
         this.excelWb.Sheets[this.excelWb.SheetNames[map.noteSheet]]=nws;
-        this.saveExcelFile();
+        return this.saveExcelFile();
     },
 
     formatDisplayDate:function(dateStr){
+        dateStr=this.normalizeDate(dateStr);
         if(!dateStr)return'';
         var parts=dateStr.split('-');
         var d=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]));
