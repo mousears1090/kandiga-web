@@ -809,7 +809,7 @@
                 </div>
                 <div class="prep-form" id="prepFormWrap">
                     <div class="prep-section">
-                        <h3 id="prepPatientTitle">Patient</h3>
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px"><h3 id="prepPatientTitle" style="margin:0">Patient</h3><button class="btn btn-sm" onclick="App.openNotesFromPrep()">Notes</button></div>
                         <div id="prepCustomRows" class="prep-free-rows"></div>
                         <button class="btn btn-sm" style="margin-bottom:12px" onclick="App.addPrepCustomRow()">+ Add Row</button>
                         <div class="fg prep-detail-fields">
@@ -902,7 +902,7 @@
 <div class="mo" id="notesModal" onclick="if(event.target===this)App.hideNotesModal()">
     <div class="notes-modal-wrap">
         <div class="modal modal-notes">
-            <div class="mh"><h2>Notes<span class="sub" id="notesSub"></span></h2><button class="mx" onclick="App.hideNotesModal()">&times;</button></div>
+            <div class="mh"><h2>Notes<span class="sub" id="notesSub"></span></h2><div style="display:flex;align-items:center;gap:8px"><button class="btn btn-sm" onclick="App.openHuddlePrepFromNotes()">Huddle Prep</button><button class="mx" onclick="App.hideNotesModal()">&times;</button></div></div>
             <div class="note-info" id="noteInfo"></div>
             <div class="note-fields" id="noteFields"></div>
             <div class="notes-body">
@@ -2357,9 +2357,43 @@ var App={
         if(this.editId)this.updateMember(this.editId,data);else this.addMember(data);
         this.hideMemberModal();return false;
     },
+    findMemberByAnyId:function(value){
+        value=String(value||'').trim();if(!value)return null;
+        return this.members.find(function(m){return m.id===value||m.memberId===value||App.hMemberId(m)===value})||null;
+    },
+    ensureRegularMemberForNotes:function(m){
+        if(!m)return null;
+        var mid=(m.memberId||this.hMemberId(m)||'').trim(),name=(m.name||this.hName(m)||'').trim();
+        var existing=mid?this.members.find(function(x){return x.memberId===mid}):null,changed=false;
+        if(existing&&existing!==m)return existing;
+        if(mid&&!m.memberId){m.memberId=mid;changed=true}
+        if(name&&!m.name){m.name=name;changed=true}
+        if(!m.tier&&this.hTier(m)){m.tier=this.hTier(m);changed=true}
+        if(!m.cm&&this.hCM(m)){m.cm=this.hCM(m);changed=true}
+        if(!m.pcp&&this.pcpOf(m)){m.pcp=this.pcpOf(m);changed=true}
+        if(m.active===false){m.active=true;changed=true}
+        if(changed)this.writeMemberCSV();
+        return m;
+    },
+    ensureHuddleForMember:function(m){
+        if(!m)return null;
+        var changed=false,mid=(this.hMemberId(m)||m.memberId||'').trim(),name=(this.hName(m)||m.name||'').trim();
+        var existing=mid?this.members.find(function(x){return x!==m&&App.hMemberId(x)===mid&&App.isInHuddle(x)}):null;
+        if(existing)return existing;
+        if(mid&&!this.hval(m,'Huddle Member ID')){this.setHval(m,'Huddle Member ID',mid);changed=true}
+        if(name&&!this.hval(m,'Huddle Name')){this.setHval(m,'Huddle Name',name);changed=true}
+        if((m.pcp||'').trim()&&!this.hval(m,'Huddle PCP')){this.setHval(m,'Huddle PCP',m.pcp);changed=true}
+        if((m.cm||'').trim()&&!this.hval(m,'Huddle Case Manager')){this.setHval(m,'Huddle Case Manager',m.cm);changed=true}
+        if((m.tier||'').trim()&&!this.hval(m,'Huddle Tier')){this.setHval(m,'Huddle Tier',m.tier);changed=true}
+        if(!this.hval(m,'Huddle Status')){this.setHval(m,'Huddle Status','pending');changed=true}
+        if(!this.hval(m,'Times Discussed')){this.setHval(m,'Times Discussed','0');changed=true}
+        if(changed)this.writeMemberCSV();
+        return m;
+    },
     showNotesModal:function(id){
         this.editingNoteId=null;
         var m=this.members.find(function(x){return x.id===id});if(!m)return;
+        m=this.ensureRegularMemberForNotes(m)||m;
         this.notesForId=m.memberId;
         document.getElementById('notesSub').textContent=' \u2014 '+m.name;
         var ph='<div class="patient-header">'
@@ -2397,6 +2431,21 @@ var App={
         this.renderHints();
         document.getElementById('notesModal').classList.add('open');this.lockScroll();
         setTimeout(function(){document.getElementById('noteInput').focus()},50);
+    },
+    openHuddlePrepFromNotes:function(){
+        var m=this.findMemberByAnyId(this.notesForId);if(!m){this.toast('No patient selected','danger');return}
+        m=this.ensureHuddleForMember(m);
+        this.hideNotesModal();
+        this.showHuddlePrepForMember(m);
+        this.toast('Opened huddle prep for '+(this.hName(m)||m.name||'patient'),'success');
+    },
+    openNotesFromPrep:function(){
+        var m=this.prepCurrentMember();if(!m){this.toast('No prep patient selected','danger');return}
+        this.saveCurrentHuddlePrep(true);
+        m=this.ensureRegularMemberForNotes(m);
+        this.hideHuddlePrepModal();
+        this.showNotesModal(m.id);
+        this.toast('Opened notes for '+(m.name||this.hName(m)||'patient'),'success');
     },
     updateFromNotes:function(){
         if(!this.notesForId)return;
@@ -3685,16 +3734,26 @@ var App={
             return true;
         });
     },
-    showHuddlePrepModal:function(){
-        var rows=this.huddlePrepSourceRows();if(!rows.length){this.toast('Pick or generate active huddle patients first','danger');return}
+    openHuddlePrepRows:function(rows,target){
+        rows=rows||[];
+        if(target&&rows.indexOf(target)===-1)rows.unshift(target);
+        if(!rows.length){this.toast('Pick or generate active huddle patients first','danger');return}
         var s=this.getHuddlePrepSettings();
         document.getElementById('prepPdfTitle').value=s.title||'Huddle Prep Notes';
         document.getElementById('prepPdfFileName').value=s.fileName||'huddle-prep-notes.pdf';
         this.prepPopulateOutputOptions(s);
         var mapped=0,self=this;rows.forEach(function(m){if(self.applyPrepMappingsToMember(m,false))mapped++});if(mapped)this.writeMemberCSV();
-        this.huddlePrepRows=rows;this.huddlePrepIndex=0;
+        this.huddlePrepRows=rows;this.huddlePrepIndex=target?Math.max(0,rows.indexOf(target)):0;
         ['prepPatientSearch','prepFilterCM','prepFilterProvider','prepFilterField','prepFilterValue'].forEach(function(id){var el=document.getElementById(id);if(el)el.value=''});
         document.getElementById('huddlePrepModal').classList.add('open');this.lockScroll();this.setPrepMode(localStorage.getItem('mm_huddle_prep_mode')||'lines');this.renderHuddlePrep();
+    },
+    showHuddlePrepModal:function(){
+        this.openHuddlePrepRows(this.huddlePrepSourceRows());
+    },
+    showHuddlePrepForMember:function(m){
+        m=this.ensureHuddleForMember(m);if(!m)return;
+        var rows=this.huddlePrepSourceRows();
+        this.openHuddlePrepRows(rows,m);
     },
     hideHuddlePrepModal:function(){if(document.getElementById('huddlePrepModal').classList.contains('open'))this.saveCurrentHuddlePrep(true);document.getElementById('huddlePrepModal').classList.remove('open');this.unlockScroll()},
     renderHuddlePrep:function(){
