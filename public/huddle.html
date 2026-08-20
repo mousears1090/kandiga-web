@@ -487,6 +487,15 @@
             background:var(--bg-3);color:var(--t2);border:1px solid var(--bd);white-space:nowrap;vertical-align:middle}
         .rem-badge.active{background:var(--amber-bg,#fff7ed);color:var(--amber,#b45309);border-color:var(--amber-bd,#fed7aa);animation:rempulse 1.6s ease-in-out infinite}
         @keyframes rempulse{0%,100%{opacity:1}50%{opacity:.55}}
+        /* inline SVG icons (no emoji) */
+        .ic{width:14px;height:14px;vertical-align:-2px;flex:none}
+        .rem-bell .ic{width:15px;height:15px}
+        .mh .ic{width:17px;height:17px;vertical-align:-3px;margin-right:3px}
+        .td-card-h .ic{width:15px;height:15px;color:var(--t2)}
+        /* team switcher */
+        .team-sel{font-family:var(--font);font-size:12.5px;font-weight:700;padding:6px 26px 6px 10px;border:1px solid var(--bd);
+            border-radius:8px;background:var(--bg-1);color:var(--t1);cursor:pointer;margin-left:10px}
+        .team-sel:hover{border-color:var(--acc)}
         /* Today view */
         .today-view{padding:18px 26px 40px;max-width:1240px;margin:0 auto}
         .td-date{font-size:21px;font-weight:800;letter-spacing:-.01em;margin-bottom:16px}
@@ -582,6 +591,7 @@
         <div class="header-left">
             <h1>Member<span class="ac">Manager</span></h1>
             <div class="file-badges"><span class="fb" id="badgeM"></span></div>
+            <select id="teamSel" class="team-sel" onchange="App.onTeamSelect(this.value)" title="Switch team — same patients and notes, separate call/reminder/huddle work"></select>
         </div>
         <div class="pt-clock" id="ptClock"></div>
         <div class="header-right">
@@ -620,7 +630,7 @@
         </div>
         <div class="stats" id="stats"></div>
         <button class="btn btn-sm" onclick="App.showSortModal()">Sort</button>
-        <button class="btn btn-sm" onclick="App.resetSort()" title="Reset sorting to default order">&#8635; Default</button>
+        <button class="btn btn-sm" onclick="App.resetSort()" title="Reset sorting to default order"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg> Default</button>
     </div>
     <div class="filter-bar" id="filterBar">
         <div class="filter-bar-row">
@@ -1035,7 +1045,7 @@
 
 <!-- REMINDER MODAL -->
 <div class="mo" id="reminderModal" onclick="if(event.target===this)App.hideReminderModal()">
-    <div class="modal modal-sm"><div class="mh"><h2>&#128276; Reminder<span class="sub" id="remModalSub" style="font-weight:400;color:var(--t3)"></span></h2><button class="mx" onclick="App.hideReminderModal()">&times;</button></div>
+    <div class="modal modal-sm"><div class="mh"><h2><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> Reminder<span class="sub" id="remModalSub" style="font-weight:400;color:var(--t3)"></span></h2><button class="mx" onclick="App.hideReminderModal()">&times;</button></div>
     <div class="mb">
         <div class="fi"><label>Date &amp; time</label><input type="datetime-local" id="remModalAt"></div>
         <div class="fi" style="margin-top:12px"><label>Reason</label><input type="text" id="remModalNote" placeholder="e.g. wants a call back at this time"></div>
@@ -1697,6 +1707,8 @@ var App={
                 document.getElementById('setup').style.display='none';
                 document.getElementById('app').style.display='block';
                 document.getElementById('badgeM').textContent=self.mFile;
+                self.activeTeam=(self.members[0]&&self.members[0].extra&&self.members[0].extra['Active Team'])||'Team 1';
+                self.buildTeamSelect();
                 var bumped=self.bumpPastDates();
                 self.render();
                 self.updateClock();
@@ -2038,13 +2050,53 @@ var App={
         var mm=t.match(/^(.*?)\s*(AM|PM)$/i),hm=mm?mm[1].trim():t,ap=mm?mm[2]:'';
         el.innerHTML='<span class="pt-time">'+hm+(ap?'<span class="pt-ampm">'+ap+'</span>':'')+'</span><span class="pt-zone">PT</span><span class="pt-date">'+dt+'</span>';
         if(!this._clockTimer)this._clockTimer=setInterval(function(){App.updateClock()},1000)},
+    /* ===== inline SVG icons (replaces emoji) ===== */
+    icon:function(n){var p={
+        bell:'<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+        clock:'<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/>',
+        phone:'<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>',
+        target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>'
+    };return '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(p[n]||'')+'</svg>'},
+    /* ===== TEAMS — same patients + shared notes; per-team work state (calls, reminders, huddle).
+       Stored in the same CSV as namespaced columns "[Team X] <field>". ===== */
+    activeTeam:'Team 1',
+    teamFields:function(){var base=['Next Call','Call Type','Reminder At','Reminder Note','Review During Daily','Daily Review Until'];
+        return base.concat(this.huddleHeaders||[]).filter(function(v,i,a){return v&&a.indexOf(v)===i})},
+    getLiveField:function(m,f){if(f==='Next Call')return m.nextCall||'';if(f==='Call Type')return m.callType||'';return (m.extra&&m.extra[f])||''},
+    setLiveField:function(m,f,v){if(f==='Next Call'){m.nextCall=v||''}else if(f==='Call Type'){m.callType=v||''}else{m.extra=m.extra||{};m.extra[f]=v||''}},
+    getTeams:function(){var names={'Team 1':1};names[this.activeTeam]=1;var re=/^\[(.+?)\] /;
+        (this.csvHeaders||[]).forEach(function(h){var mm=re.exec(h||'');if(mm)names[mm[1]]=1});
+        this.members.forEach(function(m){Object.keys(m.extra||{}).forEach(function(k){var mm=re.exec(k);if(mm)names[mm[1]]=1})});
+        var out=Object.keys(names);out.sort(function(a,b){if(a==='Team 1')return -1;if(b==='Team 1')return 1;return a.localeCompare(b)});return out},
+    buildTeamSelect:function(){var s=document.getElementById('teamSel');if(!s)return;var self=this;
+        s.innerHTML=this.getTeams().map(function(t){return '<option'+(t===self.activeTeam?' selected':'')+'>'+self.esc(t)+'</option>'}).join('')
+            +'<option value="__new">+ New team…</option>'},
+    onTeamSelect:function(v){
+        if(v==='__new'){var n=prompt('New team name:');this.buildTeamSelect();if(!n)return;n=n.trim();
+            if(!n||/[\[\]]/.test(n)){this.toast('Invalid team name','danger');return}
+            if(this.getTeams().indexOf(n)!==-1){this.toast('That team already exists','danger');return}
+            this.switchTeam(n);return}
+        this.switchTeam(v)},
+    switchTeam:function(t){
+        if(t===this.activeTeam){this.buildTeamSelect();return}
+        var fields=this.teamFields(),self=this,from=this.activeTeam;
+        this.members.forEach(function(m){m.extra=m.extra||{};
+            fields.forEach(function(f){m.extra['['+from+'] '+f]=self.getLiveField(m,f)||''});   // stash the team you're leaving
+            fields.forEach(function(f){self.setLiveField(m,f,m.extra['['+t+'] '+f]||'')});      // load the team you're entering
+            m.extra['Active Team']=t;
+        });
+        this.activeTeam=t;this.huddleSelected={};this._remSig=undefined;
+        this.buildTeamSelect();this.writeMemberCSV();this.render();this.renderReminders();
+        if(this.currentView==='huddle')this.renderHuddle();
+        if(this.currentView==='today')this.renderToday();
+        this.toast('Switched to '+t+' — '+from+' saved','success')},
     remTimeShort:function(t){var d=this.remDate(t);if(!d)return t;var hh=d.getHours(),mm=d.getMinutes(),ap=hh<12?'AM':'PM',h12=hh%12||12;
         var tm=h12+(mm?':'+('0'+mm).slice(-2):'')+ap;return d.toDateString()===this.pacificNow().toDateString()?tm:((d.getMonth()+1)+'/'+d.getDate()+' '+tm)},
     reminderBadge:function(m){var t=this.remAt(m);if(!t)return '';var act=this.remActive(m);
         return ' <span class="rem-badge'+(act?' active':'')+'" title="'+this.esc((this.remNote(m)||'Reminder')+' @ '+this.remTimeShort(t))+'">&#128276; '+this.esc(this.remTimeShort(t))+'</span>'},
     reminderBell:function(m){var t=this.remAt(m),st=this.remState(m),has=!!t;
         var title=has?(this.esc((this.remNote(m)||'Reminder')+' @ '+this.remTimeShort(t)+(st==='overdue'?' (overdue)':''))):'Add reminder';
-        return ' <button class="rem-bell'+(has?' has':'')+(st?' '+st:'')+'" title="'+title+'" onclick="event.stopPropagation();App.openReminderModal(\''+m.id+'\')">&#128276;'+(has?'<span class="rem-bell-t">'+this.esc(this.remTimeShort(t))+'</span>':'')+'</button>'},
+        return ' <button class="rem-bell'+(has?' has':'')+(st?' '+st:'')+'" title="'+title+'" onclick="event.stopPropagation();App.openReminderModal(\''+m.id+'\')">'+this.icon('bell')+(has?'<span class="rem-bell-t">'+this.esc(this.remTimeShort(t))+'</span>':'')+'</button>'},
     openReminderModal:function(id){var m=this.members.find(function(x){return x.id===id||x.memberId===id});if(!m)return;
         this._remModalId=m.id;
         document.getElementById('remModalSub').textContent=' — '+(m.name||m.memberId);
@@ -2080,16 +2132,16 @@ var App={
         var due=list.filter(function(m){return self.remState(m)==='due'}).length;
         var over=list.filter(function(m){return self.remState(m)==='overdue'}).length;
         var need=due+over;
-        if(btn){ btn.innerHTML='&#128276; Reminders'+(list.length?' ('+list.length+')':'');
+        if(btn){ btn.innerHTML=this.icon('bell')+' Reminders'+(list.length?' ('+list.length+')':'');
             btn.classList.toggle('btn-p', !!this.remOpen);
             btn.classList.toggle('rem-btn-due', due>0 && over===0 && !this.remOpen);
             btn.classList.toggle('rem-btn-overdue', over>0 && !this.remOpen); }
         if(!this.remOpen){ el.style.display='none'; el.innerHTML=''; return; }
         el.style.display='block';
         var countHtml=need?' <span class="rem-count'+(over?' overdue':'')+'">'+(over?over+' overdue'+(due?', '+due+' due':''):due+' due')+'</span>':'';
-        var head='<div class="rem-head">&#128276; Reminders'+countHtml
+        var head='<div class="rem-head">'+this.icon('bell')+' Reminders'+countHtml
             +'<button class="rem-x" title="Close" onclick="App.toggleReminders()">&times;</button></div>';
-        if(!list.length){ el.innerHTML=head+'<div class="rem-empty">No reminders. Click the &#128276; bell next to a patient to add one.</div>'; return; }
+        if(!list.length){ el.innerHTML=head+'<div class="rem-empty">No reminders. Click the bell next to a patient to add one.</div>'; return; }
         el.innerHTML=head+'<div class="rem-list">'+list.map(function(m){var st=self.remState(m);
             return '<div class="rem-item'+(st?' '+st:'')+'" onclick="App.openReminderPatient(\''+m.id+'\')">'
                 +'<div class="rem-row1"><span class="rem-when">'+self.esc(self.remTimeShort(self.remAt(m)))+(st==='overdue'?' • overdue':st==='due'?' • now':'')+'</span>'
@@ -2132,10 +2184,10 @@ var App={
             return '<div class="td-row" onclick="App.setView(\'huddle\')"><div class="td-main"><div class="td-name">'+self.esc(nm)+'</div><div class="td-sub">pending discussion</div></div><span class="td-chip due">huddle</span></div>';}).join('');
         el.innerHTML='<div class="td-date">'+dateStr+'<span>'+timeStr+' PT</span></div>'
             +'<div class="td-grid">'
-            +card('Reminders','&#128276;', rem.some(function(m){return self.remState(m)==='overdue'})?'bad':'warn', rem.length, remRows,'Nothing due right now')
-            +card('Later today','&#9200;','',upcoming.length,upRows,'No more reminders today')
-            +card('Calls due today','&#128222;','warn',dueCalls.length,callRows,'No calls scheduled today')
-            +card('Huddle pending','&#127919;','warn',pending.length,pendRows,'No pending huddle patients')
+            +card('Reminders',this.icon('bell'), rem.some(function(m){return self.remState(m)==='overdue'})?'bad':'warn', rem.length, remRows,'Nothing due right now')
+            +card('Later today',this.icon('clock'),'',upcoming.length,upRows,'No more reminders today')
+            +card('Calls due today',this.icon('phone'),'warn',dueCalls.length,callRows,'No calls scheduled today')
+            +card('Huddle pending',this.icon('target'),'warn',pending.length,pendRows,'No pending huddle patients')
             +'</div>';
     },
     applyCustomSort:function(){
