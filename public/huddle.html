@@ -496,6 +496,9 @@
         .team-sel{font-family:var(--font);font-size:12.5px;font-weight:700;padding:6px 26px 6px 10px;border:1px solid var(--bd);
             border-radius:8px;background:var(--bg-1);color:var(--t1);cursor:pointer;margin-left:10px}
         .team-sel:hover{border-color:var(--acc)}
+        .team-del{margin-left:6px;border:1px solid var(--bd);background:var(--bg-1);color:var(--t3);border-radius:8px;
+            padding:6px 8px;cursor:pointer;line-height:1}
+        .team-del:hover{color:var(--red,#dc2626);border-color:var(--red,#dc2626);background:var(--red-bg,#fef2f2)}
         /* Today view */
         .today-view{padding:20px 28px 24px;display:flex;flex-direction:column;height:calc(100vh - 128px);overflow:hidden}
         .td-date{font-size:24px;font-weight:800;letter-spacing:-.01em;margin-bottom:16px;flex:none}
@@ -601,6 +604,7 @@
             <h1>Member<span class="ac">Manager</span></h1>
             <div class="file-badges"><span class="fb" id="badgeM"></span></div>
             <select id="teamSel" class="team-sel" onchange="App.onTeamSelect(this.value)" title="Switch team — same patients and notes, separate call/reminder/huddle work"></select>
+            <button id="teamDelBtn" class="team-del" style="display:none" onclick="App.deleteTeamPrompt()" title="Delete this team (patients and notes are kept)"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
         </div>
         <div class="pt-clock" id="ptClock"></div>
         <div class="header-right">
@@ -2080,7 +2084,21 @@ var App={
         var out=Object.keys(names);out.sort(function(a,b){if(a==='Team 1')return -1;if(b==='Team 1')return 1;return a.localeCompare(b)});return out},
     buildTeamSelect:function(){var s=document.getElementById('teamSel');if(!s)return;var self=this;
         s.innerHTML=this.getTeams().map(function(t){return '<option'+(t===self.activeTeam?' selected':'')+'>'+self.esc(t)+'</option>'}).join('')
-            +'<option value="__new">+ New team…</option>'},
+            +'<option value="__new">+ New team…</option>';
+        var db=document.getElementById('teamDelBtn');if(db)db.style.display=this.activeTeam==='Team 1'?'none':''},
+    deleteTeamPrompt:function(){var t=this.activeTeam;
+        if(t==='Team 1'){this.toast('Team 1 is permanent','danger');return}
+        if(!confirm('Delete "'+t+'"?\n\nPatients and note history are kept. Only this team\'s calls, reminders, and huddle work are removed. Other teams are untouched.'))return;
+        this.deleteTeam(t)},
+    deleteTeam:function(t){
+        if(t==='Team 1')return;
+        var pre='['+t+'] ';
+        if(this.activeTeam===t)this.switchTeam('Team 1');          // land back on Team 1 (its data loads)
+        this.members.forEach(function(m){var x=m.extra||{};
+            Object.keys(x).forEach(function(k){if(k.indexOf(pre)===0)delete x[k]})});
+        this.csvHeaders=(this.csvHeaders||[]).filter(function(h){return String(h||'').indexOf(pre)!==0});
+        this.buildTeamSelect();this.writeMemberCSV();
+        this.toast('Deleted "'+t+'" — patients and notes kept','success')},
     onTeamSelect:function(v){
         if(v==='__new'){var n=prompt('New team name:');this.buildTeamSelect();if(!n)return;n=n.trim();
             if(!n||/[\[\]]/.test(n)){this.toast('Invalid team name','danger');return}
