@@ -487,6 +487,13 @@
             background:var(--bg-3);color:var(--t2);border:1px solid var(--bd);white-space:nowrap;vertical-align:middle}
         .rem-badge.active{background:var(--amber-bg,#fff7ed);color:var(--amber,#b45309);border-color:var(--amber-bd,#fed7aa);animation:rempulse 1.6s ease-in-out infinite}
         @keyframes rempulse{0%,100%{opacity:1}50%{opacity:.55}}
+        .rem-bell{display:inline-flex;align-items:center;gap:3px;vertical-align:middle;margin-left:5px;font-size:12px;line-height:1;
+            border:1px solid transparent;background:none;color:var(--t3);border-radius:999px;padding:1px 6px;cursor:pointer;opacity:.5;transition:all .12s}
+        tr:hover .rem-bell{opacity:1}
+        .rem-bell:hover{color:var(--acc);opacity:1;background:var(--acc-bg)}
+        .rem-bell.has{opacity:1;color:var(--t2);background:var(--bg-3);border-color:var(--bd);font-weight:700}
+        .rem-bell.active{color:var(--amber,#b45309);background:var(--amber-bg,#fff7ed);border-color:var(--amber-bd,#fde68a);animation:rempulse 1.6s ease-in-out infinite}
+        .rem-bell-t{font-size:10.5px;font-weight:700}
         .rem-panel{position:fixed;right:18px;bottom:18px;width:280px;max-height:60vh;overflow:auto;z-index:900;
             background:var(--bg-1);border:1px solid var(--bd);border-radius:12px;box-shadow:0 10px 34px rgba(0,0,0,.16);font-family:var(--font)}
         .rem-head{position:sticky;top:0;background:var(--bg-1);padding:11px 14px;font-size:13px;font-weight:800;color:var(--t1);border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:7px}
@@ -982,6 +989,17 @@
     <div class="modal modal-sm"><div class="mh"><h2>Delete Member</h2><button class="mx" onclick="App.hideDeleteModal()">&times;</button></div>
     <div class="mb"><p style="color:var(--t2)">Delete <strong id="delName"></strong> and all their notes?</p></div>
     <div class="mf"><button class="btn" onclick="App.hideDeleteModal()">Cancel</button><button class="btn btn-d" onclick="App.confirmDelete()">Delete</button></div>
+    </div>
+</div>
+
+<!-- REMINDER MODAL -->
+<div class="mo" id="reminderModal" onclick="if(event.target===this)App.hideReminderModal()">
+    <div class="modal modal-sm"><div class="mh"><h2>&#128276; Reminder<span class="sub" id="remModalSub" style="font-weight:400;color:var(--t3)"></span></h2><button class="mx" onclick="App.hideReminderModal()">&times;</button></div>
+    <div class="mb">
+        <div class="fi"><label>Date &amp; time</label><input type="datetime-local" id="remModalAt"></div>
+        <div class="fi" style="margin-top:12px"><label>Reason</label><input type="text" id="remModalNote" placeholder="e.g. wants a call back at this time"></div>
+    </div>
+    <div class="mf"><button class="btn btn-d" id="remModalComplete" style="display:none" onclick="App.completeReminderFromModal()">&#10003; Complete</button><span style="flex:1"></span><button class="btn" onclick="App.hideReminderModal()">Cancel</button><button class="btn btn-p" onclick="App.saveReminderFromModal()">Save</button></div>
     </div>
 </div>
 
@@ -1970,6 +1988,21 @@ var App={
         var tm=h12+(mm?':'+('0'+mm).slice(-2):'')+ap;return d.toDateString()===new Date().toDateString()?tm:((d.getMonth()+1)+'/'+d.getDate()+' '+tm)},
     reminderBadge:function(m){var t=this.remAt(m);if(!t)return '';var act=this.remActive(m);
         return ' <span class="rem-badge'+(act?' active':'')+'" title="'+this.esc((this.remNote(m)||'Reminder')+' @ '+this.remTimeShort(t))+'">&#128276; '+this.esc(this.remTimeShort(t))+'</span>'},
+    reminderBell:function(m){var t=this.remAt(m),act=this.remActive(m),has=!!t;
+        var title=has?(this.esc((this.remNote(m)||'Reminder')+' @ '+this.remTimeShort(t))):'Add reminder';
+        return ' <button class="rem-bell'+(has?' has':'')+(act?' active':'')+'" title="'+title+'" onclick="event.stopPropagation();App.openReminderModal(\''+m.id+'\')">&#128276;'+(has?'<span class="rem-bell-t">'+this.esc(this.remTimeShort(t))+'</span>':'')+'</button>'},
+    openReminderModal:function(id){var m=this.members.find(function(x){return x.id===id||x.memberId===id});if(!m)return;
+        this._remModalId=m.id;
+        document.getElementById('remModalSub').textContent=' — '+(m.name||m.memberId);
+        document.getElementById('remModalAt').value=(this.remAt(m)||'').replace(' ','T');
+        document.getElementById('remModalNote').value=this.remNote(m);
+        var comp=document.getElementById('remModalComplete');if(comp)comp.style.display=this.remAt(m)?'':'none';
+        document.getElementById('reminderModal').classList.add('open');this.lockScroll();
+        var at=document.getElementById('remModalAt');setTimeout(function(){at.focus()},50)},
+    hideReminderModal:function(){document.getElementById('reminderModal').classList.remove('open');this.unlockScroll();this._remModalId=null},
+    saveReminderFromModal:function(){var at=document.getElementById('remModalAt').value||'',note=document.getElementById('remModalNote').value||'';
+        this.setReminder(this._remModalId,at,note);this.hideReminderModal();this.toast(at?'Reminder saved':'Reminder cleared','success')},
+    completeReminderFromModal:function(){this.setReminder(this._remModalId,'','');this.hideReminderModal();this.toast('Reminder completed','success')},
     setReminder:function(idOrMid,at,note){var m=this.members.find(function(x){return x.id===idOrMid||x.memberId===idOrMid});if(!m)return;
         m.extra=m.extra||{};
         if(at)m.extra['Reminder At']=at;else delete m.extra['Reminder At'];
@@ -1978,7 +2011,7 @@ var App={
     updateReminderFromNotes:function(){var a=document.getElementById('nfReminderAt'),n=document.getElementById('nfReminderNote');if(!a)return;
         this.setReminder(this.notesForId,a.value||'',n?(n.value||''):'')},
     dismissReminder:function(id){this.setReminder(id,'','')},
-    openReminderPatient:function(id){var m=this.members.find(function(x){return x.id===id});if(m){this.remOpen=false;this.renderReminders();this.showNotesModal(m.id)}},
+    openReminderPatient:function(id){var m=this.members.find(function(x){return x.id===id});if(m)this.openReminderModal(m.id)},
     remOpen:false,
     toggleReminders:function(){this.remOpen=!this.remOpen;this.renderReminders()},
     renderReminders:function(){
@@ -2316,7 +2349,7 @@ var App={
                     return '<tr class="'+(m.active===false?'inactive':'')+(isSel?' selected':'')+'" onclick="App.rowClick(event,\''+m.id+'\')">'
                         +'<td class="cell-check"><input type="checkbox"'+(isSel?' checked':'')+' onclick="event.stopPropagation();App.toggleSelect(\''+m.id+'\',this.checked)"></td>'
                         +'<td class="cell-id">'+self.esc(m.memberId)+' <button class="copy-btn" onclick="event.stopPropagation();App.copyText(\''+self.esc(m.memberId)+'\')" title="Copy Member ID">&#9112;</button></td>'
-                        +'<td class="cell-name">'+self.esc(m.name)+self.reminderBadge(m)+'</td>'
+                        +'<td class="cell-name">'+self.esc(m.name)+self.reminderBell(m)+'</td>'
                         +'<td><span class="tier '+tc+'">'+self.esc(m.tier)+'</span></td>'
                         +'<td>'+self.esc(m.nextCall)+'</td>'
                         +'<td'+(isUrg?' class="cell-urgent"':'')+'>'+self.esc(m.callType)+'</td>'
@@ -2494,9 +2527,6 @@ var App={
         var reviewChecked=this.isDailyReviewActive(m)?' checked':'';
         document.getElementById('noteFields').innerHTML=dateFields+'<div class="nf-group"><label>Call Type</label><select id="nfCallType" onchange="App.updateFromNotes()"><option value="">Select...</option>'+opts+'</select></div>'
             +'<div class="nf-group"><label>Review</label><label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--t2);text-transform:none;letter-spacing:0;font-weight:600"><input type="checkbox" id="nfDailyReview" onchange="App.updateDailyReviewFromNotes(this.checked)"'+reviewChecked+' style="width:15px;height:15px;accent-color:var(--acc)"> Review during Daily</label></div>';
-        document.getElementById('noteFields').innerHTML+=
-            '<div class="nf-group"><label>&#128276; Reminder</label><input type="datetime-local" id="nfReminderAt" value="'+this.esc((this.remAt(m)||'').replace(' ','T'))+'" onchange="App.updateReminderFromNotes()"></div>'
-            +'<div class="nf-group"><label>Reminder note</label><input type="text" id="nfReminderNote" value="'+this.esc(this.remNote(m))+'" placeholder="e.g. wants a call back" onchange="App.updateReminderFromNotes()"></div>';
         document.getElementById('noteInput').value='';
         document.getElementById('noteActionBtn').textContent='Add Note';
         this.renderNotesList();
