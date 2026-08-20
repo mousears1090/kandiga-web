@@ -487,14 +487,22 @@
             background:var(--bg-3);color:var(--t2);border:1px solid var(--bd);white-space:nowrap;vertical-align:middle}
         .rem-badge.active{background:var(--amber-bg,#fff7ed);color:var(--amber,#b45309);border-color:var(--amber-bd,#fed7aa);animation:rempulse 1.6s ease-in-out infinite}
         @keyframes rempulse{0%,100%{opacity:1}50%{opacity:.55}}
-        .rem-bell{display:inline-flex;align-items:center;gap:3px;vertical-align:middle;margin-left:5px;font-size:12px;line-height:1;
-            border:1px solid transparent;background:none;color:var(--t3);border-radius:999px;padding:1px 6px;cursor:pointer;opacity:.5;transition:all .12s}
+        /* Pacific-time header clock */
+        .pt-clock{display:flex;align-items:baseline;gap:8px;white-space:nowrap;padding:5px 14px;border-radius:999px;
+            background:var(--bg-2);border:1px solid var(--bd)}
+        .pt-time{font-size:19px;font-weight:800;letter-spacing:-.01em;color:var(--t1);font-variant-numeric:tabular-nums}
+        .pt-ampm{font-size:11px;font-weight:800;color:var(--t3);margin-left:3px}
+        .pt-zone{font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff;background:var(--acc);border-radius:5px;padding:2px 6px;position:relative;top:-2px}
+        .pt-date{font-size:12px;font-weight:600;color:var(--t3)}
+        @media(max-width:760px){.pt-clock{display:none}}
+        .rem-bell{display:inline-flex;align-items:center;gap:4px;vertical-align:middle;margin-left:6px;font-size:15px;line-height:1;
+            border:1px solid transparent;background:none;color:var(--t3);border-radius:999px;padding:2px 8px;cursor:pointer;opacity:.5;transition:all .12s}
         tr:hover .rem-bell{opacity:1}
         .rem-bell:hover{color:var(--acc);opacity:1;background:var(--acc-bg)}
         .rem-bell.has{opacity:1;color:var(--t2);background:var(--bg-3);border-color:var(--bd);font-weight:700}
         .rem-bell.due{color:var(--amber,#b45309);background:var(--amber-bg,#fff7ed);border-color:var(--amber-bd,#fde68a);animation:rempulse 1.6s ease-in-out infinite}
         .rem-bell.overdue{color:#fff;background:var(--red,#dc2626);border-color:var(--red,#dc2626);animation:rempulse 1.15s ease-in-out infinite}
-        .rem-bell-t{font-size:10.5px;font-weight:700}
+        .rem-bell-t{font-size:13px;font-weight:800}
         .rem-panel{position:fixed;right:18px;bottom:18px;width:280px;max-height:60vh;overflow:auto;z-index:900;
             background:var(--bg-1);border:1px solid var(--bd);border-radius:12px;box-shadow:0 10px 34px rgba(0,0,0,.16);font-family:var(--font)}
         .rem-head{position:sticky;top:0;background:var(--bg-1);padding:11px 14px;font-size:13px;font-weight:800;color:var(--t1);border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:7px}
@@ -555,6 +563,7 @@
             <h1>Member<span class="ac">Manager</span></h1>
             <div class="file-badges"><span class="fb" id="badgeM"></span></div>
         </div>
+        <div class="pt-clock" id="ptClock"></div>
         <div class="header-right">
             <button class="btn" onclick="App.showImportPicker()">Import CSV</button>
             <button class="btn btn-p" onclick="App.showMemberModal()">+ Add Member</button>
@@ -1663,6 +1672,7 @@ var App={
                 document.getElementById('badgeM').textContent=self.mFile;
                 var bumped=self.bumpPastDates();
                 self.render();
+                self.updateClock();
                 self.renderReminders();
                 self.toast('Ready — changes auto-save to CSV'+(bumped?' (past dates moved to today)':''),'success');
             },300);
@@ -1988,11 +1998,21 @@ var App={
     remAt:function(m){return (m&&m.extra&&m.extra['Reminder At'])||''},
     remNote:function(m){return (m&&m.extra&&m.extra['Reminder Note'])||''},
     remDate:function(t){if(!t)return null;var d=new Date(String(t).replace(' ','T'));return isNaN(d)?null:d},
-    remActive:function(m){var d=this.remDate(this.remAt(m));return d?d.getTime()<=Date.now():false},
-    remState:function(m){var d=this.remDate(this.remAt(m));if(!d)return '';var diff=Date.now()-d.getTime();
+    pacificNow:function(){return new Date(new Date().toLocaleString('en-US',{timeZone:'America/Los_Angeles'}))},
+    pacificNowInput:function(){var n=this.pacificNow(),p=function(x){return('0'+x).slice(-2)};
+        return n.getFullYear()+'-'+p(n.getMonth()+1)+'-'+p(n.getDate())+'T'+p(n.getHours())+':'+p(n.getMinutes())},
+    remActive:function(m){var d=this.remDate(this.remAt(m));return d?d.getTime()<=this.pacificNow().getTime():false},
+    remState:function(m){var d=this.remDate(this.remAt(m));if(!d)return '';var diff=this.pacificNow().getTime()-d.getTime();
         if(diff<0)return 'upcoming'; if(diff<=30*60000)return 'due'; return 'overdue'},
+    updateClock:function(){var el=document.getElementById('ptClock');if(!el)return;
+        var now=new Date();
+        var t=now.toLocaleTimeString('en-US',{timeZone:'America/Los_Angeles',hour:'numeric',minute:'2-digit'});
+        var dt=now.toLocaleDateString('en-US',{timeZone:'America/Los_Angeles',weekday:'short',month:'short',day:'numeric'});
+        var mm=t.match(/^(.*?)\s*(AM|PM)$/i),hm=mm?mm[1].trim():t,ap=mm?mm[2]:'';
+        el.innerHTML='<span class="pt-time">'+hm+(ap?'<span class="pt-ampm">'+ap+'</span>':'')+'</span><span class="pt-zone">PT</span><span class="pt-date">'+dt+'</span>';
+        if(!this._clockTimer)this._clockTimer=setInterval(function(){App.updateClock()},1000)},
     remTimeShort:function(t){var d=this.remDate(t);if(!d)return t;var hh=d.getHours(),mm=d.getMinutes(),ap=hh<12?'AM':'PM',h12=hh%12||12;
-        var tm=h12+(mm?':'+('0'+mm).slice(-2):'')+ap;return d.toDateString()===new Date().toDateString()?tm:((d.getMonth()+1)+'/'+d.getDate()+' '+tm)},
+        var tm=h12+(mm?':'+('0'+mm).slice(-2):'')+ap;return d.toDateString()===this.pacificNow().toDateString()?tm:((d.getMonth()+1)+'/'+d.getDate()+' '+tm)},
     reminderBadge:function(m){var t=this.remAt(m);if(!t)return '';var act=this.remActive(m);
         return ' <span class="rem-badge'+(act?' active':'')+'" title="'+this.esc((this.remNote(m)||'Reminder')+' @ '+this.remTimeShort(t))+'">&#128276; '+this.esc(this.remTimeShort(t))+'</span>'},
     reminderBell:function(m){var t=this.remAt(m),st=this.remState(m),has=!!t;
@@ -2001,7 +2021,7 @@ var App={
     openReminderModal:function(id){var m=this.members.find(function(x){return x.id===id||x.memberId===id});if(!m)return;
         this._remModalId=m.id;
         document.getElementById('remModalSub').textContent=' — '+(m.name||m.memberId);
-        document.getElementById('remModalAt').value=(this.remAt(m)||'').replace(' ','T');
+        document.getElementById('remModalAt').value=(this.remAt(m)||this.pacificNowInput()).replace(' ','T');
         document.getElementById('remModalNote').value=this.remNote(m);
         var comp=document.getElementById('remModalComplete');if(comp)comp.style.display=this.remAt(m)?'':'none';
         document.getElementById('reminderModal').classList.add('open');this.lockScroll();
