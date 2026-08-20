@@ -497,25 +497,29 @@
             border-radius:8px;background:var(--bg-1);color:var(--t1);cursor:pointer;margin-left:10px}
         .team-sel:hover{border-color:var(--acc)}
         /* Today view */
-        .today-view{padding:18px 26px 40px;max-width:1240px;margin:0 auto}
-        .td-date{font-size:21px;font-weight:800;letter-spacing:-.01em;margin-bottom:16px}
-        .td-date span{color:var(--t3);font-weight:700;font-size:13px;margin-left:10px}
-        .td-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:start}
-        .td-card{background:var(--bg-1);border:1px solid var(--bd);border-radius:12px;overflow:hidden}
-        .td-card-h{display:flex;align-items:center;gap:8px;padding:11px 14px;font-size:13px;font-weight:800;color:var(--t1);border-bottom:1px solid var(--bd);background:var(--bg-2)}
-        .td-count{margin-left:auto;font-size:11px;font-weight:800;border-radius:999px;padding:1px 9px;background:var(--bg-3);color:var(--t2)}
+        .today-view{padding:20px 28px 32px;display:flex;flex-direction:column;min-height:calc(100vh - 132px)}
+        .td-date{font-size:24px;font-weight:800;letter-spacing:-.01em;margin-bottom:16px;flex:none}
+        .td-date span{color:var(--t3);font-weight:700;font-size:14px;margin-left:10px;font-variant-numeric:tabular-nums}
+        .td-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;flex:1;min-height:0;align-items:stretch}
+        .td-col{display:flex;flex-direction:column;gap:16px;min-width:0;min-height:0}
+        .td-col .td-card{flex:1;min-height:130px}
+        .td-card{background:var(--bg-1);border:1px solid var(--bd);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+        .td-card-h{display:flex;align-items:center;gap:9px;padding:13px 16px;font-size:14.5px;font-weight:800;color:var(--t1);border-bottom:1px solid var(--bd);background:var(--bg-2);flex:none}
+        .td-card-h .ic{width:17px;height:17px}
+        .td-count{margin-left:auto;font-size:12px;font-weight:800;border-radius:999px;padding:2px 10px;background:var(--bg-3);color:var(--t2)}
         .td-card.warn .td-count{background:var(--amber-bg,#fff7ed);color:var(--amber,#b45309)}
         .td-card.bad .td-count{background:var(--red,#dc2626);color:#fff}
-        .td-list{max-height:340px;overflow:auto}
-        .td-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--bg-2);cursor:pointer}
+        .td-list{flex:1;overflow:auto;min-height:0}
+        .td-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--bg-2);cursor:pointer}
         .td-row:hover{background:var(--bg-2)}
         .td-row:last-child{border-bottom:0}
         .td-main{min-width:0;flex:1}
-        .td-name{font-size:13.5px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .td-sub{font-size:11.5px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .td-chip{font-size:11.5px;font-weight:800;white-space:nowrap}
+        .td-name{font-size:15px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .td-sub{font-size:12.5px;color:var(--t3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .td-chip{font-size:13px;font-weight:800;white-space:nowrap}
         .td-chip.due{color:var(--amber,#b45309)} .td-chip.overdue{color:var(--red,#dc2626)} .td-chip.ok{color:var(--acc)}
-        .td-empty{padding:16px 14px;font-size:12px;color:var(--t3)}
+        .td-empty{padding:18px 16px;font-size:13px;color:var(--t3)}
+        @media(max-width:980px){.td-grid{grid-template-columns:1fr}.td-right-col{order:-1}}
         /* Pacific-time header clock */
         .pt-clock{display:flex;align-items:baseline;gap:8px;white-space:nowrap;padding:5px 14px;border-radius:999px;
             background:var(--bg-2);border:1px solid var(--bd)}
@@ -2049,6 +2053,7 @@ var App={
         var dt=now.toLocaleDateString('en-US',{timeZone:'America/Los_Angeles',weekday:'short',month:'short',day:'numeric'});
         var mm=t.match(/^(.*?)\s*(AM|PM)$/i),hm=mm?mm[1].trim():t,ap=mm?mm[2]:'';
         el.innerHTML='<span class="pt-time">'+hm+(ap?'<span class="pt-ampm">'+ap+'</span>':'')+'</span><span class="pt-zone">PT</span><span class="pt-date">'+dt+'</span>';
+        var tc=document.getElementById('tdClock');if(tc)tc.textContent=t+' PT';
         if(!this._clockTimer)this._clockTimer=setInterval(function(){App.updateClock()},1000)},
     /* ===== inline SVG icons (replaces emoji) ===== */
     icon:function(n){var p={
@@ -2158,12 +2163,16 @@ var App={
         var pn=this.pacificNow();
         var dateStr=pn.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
         var timeStr=new Date().toLocaleTimeString('en-US',{timeZone:'America/Los_Angeles',hour:'numeric',minute:'2-digit'});
-        var regs=this.members.filter(function(m){return m.active!==false&&self.isRegularMember(m)});
+        var sorted=this.filtered();   // exact same filters + sort order as the Table view
         var rem=this.members.filter(function(m){var s=self.remState(m);return s==='due'||s==='overdue'});
         rem.sort(function(a,b){return String(self.remAt(b)).localeCompare(String(self.remAt(a)))});
         var upcoming=this.members.filter(function(m){return self.remState(m)==='upcoming'&&String(self.remAt(m)).slice(0,10)===today});
         upcoming.sort(function(a,b){return String(self.remAt(a)).localeCompare(String(self.remAt(b)))});
-        var dueCalls=regs.filter(function(m){return (m.nextCall||'')===today});
+        var dueCalls=sorted.filter(function(m){return (m.nextCall||'')===today});
+        // same pinning as the table: due/overdue reminder patients float to the top
+        var dcPin=dueCalls.filter(function(m){var s=self.remState(m);return s==='due'||s==='overdue'});
+        if(dcPin.length){dcPin.sort(function(a,b){return String(self.remAt(b)).localeCompare(String(self.remAt(a)))});
+            dueCalls=dcPin.concat(dueCalls.filter(function(m){return dcPin.indexOf(m)===-1}));}
         var pending=this.members.filter(function(m){try{return String(self.hval(m,'Huddle Status')||'').trim().toLowerCase()==='pending'}catch(e){return false}});
         function row(m,chip,chipCls,sub,click){
             return '<div class="td-row" onclick="'+click+'"><div class="td-main"><div class="td-name">'+self.esc(m.name||m.memberId||'—')+'</div>'
@@ -2182,12 +2191,16 @@ var App={
             return row(m,self.esc(m.callType||''),'ok',(m.cm?m.cm+' · ':'')+(m.memberId||''),"App.showNotesModal('"+m.id+"')");}).join('');
         var pendRows=pending.map(function(m){var nm='';try{nm=self.hName(m)}catch(e){}if(!nm)nm=m.name||m.memberId;
             return '<div class="td-row" onclick="App.setView(\'huddle\')"><div class="td-main"><div class="td-name">'+self.esc(nm)+'</div><div class="td-sub">pending discussion</div></div><span class="td-chip due">huddle</span></div>';}).join('');
-        el.innerHTML='<div class="td-date">'+dateStr+'<span>'+timeStr+' PT</span></div>'
+        el.innerHTML='<div class="td-date">'+dateStr+'<span id="tdClock">'+timeStr+' PT</span></div>'
             +'<div class="td-grid">'
+            +'<div class="td-col">'
             +card('Reminders',this.icon('bell'), rem.some(function(m){return self.remState(m)==='overdue'})?'bad':'warn', rem.length, remRows,'Nothing due right now')
             +card('Later today',this.icon('clock'),'',upcoming.length,upRows,'No more reminders today')
-            +card('Calls due today',this.icon('phone'),'warn',dueCalls.length,callRows,'No calls scheduled today')
             +card('Huddle pending',this.icon('target'),'warn',pending.length,pendRows,'No pending huddle patients')
+            +'</div>'
+            +'<div class="td-col td-right-col">'
+            +card('Calls due today',this.icon('phone'),'warn',dueCalls.length,callRows,'No calls scheduled today')
+            +'</div>'
             +'</div>';
     },
     applyCustomSort:function(){
