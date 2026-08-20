@@ -492,23 +492,28 @@
         tr:hover .rem-bell{opacity:1}
         .rem-bell:hover{color:var(--acc);opacity:1;background:var(--acc-bg)}
         .rem-bell.has{opacity:1;color:var(--t2);background:var(--bg-3);border-color:var(--bd);font-weight:700}
-        .rem-bell.active{color:var(--amber,#b45309);background:var(--amber-bg,#fff7ed);border-color:var(--amber-bd,#fde68a);animation:rempulse 1.6s ease-in-out infinite}
+        .rem-bell.due{color:var(--amber,#b45309);background:var(--amber-bg,#fff7ed);border-color:var(--amber-bd,#fde68a);animation:rempulse 1.6s ease-in-out infinite}
+        .rem-bell.overdue{color:#fff;background:var(--red,#dc2626);border-color:var(--red,#dc2626);animation:rempulse 1.15s ease-in-out infinite}
         .rem-bell-t{font-size:10.5px;font-weight:700}
         .rem-panel{position:fixed;right:18px;bottom:18px;width:280px;max-height:60vh;overflow:auto;z-index:900;
             background:var(--bg-1);border:1px solid var(--bd);border-radius:12px;box-shadow:0 10px 34px rgba(0,0,0,.16);font-family:var(--font)}
         .rem-head{position:sticky;top:0;background:var(--bg-1);padding:11px 14px;font-size:13px;font-weight:800;color:var(--t1);border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:7px}
         .rem-count{font-size:10.5px;font-weight:800;color:#fff;background:var(--amber,#b45309);border-radius:999px;padding:1px 8px;vertical-align:middle}
+        .rem-count.overdue{background:var(--red,#dc2626)}
         .rem-x{margin-left:auto;border:none;background:none;color:var(--t3);font-size:19px;line-height:1;cursor:pointer;padding:0 2px}
         .rem-x:hover{color:var(--t1)}
         .rem-empty{padding:16px 14px;font-size:12px;color:var(--t3);line-height:1.5}
         .rem-btn-due{color:var(--amber,#b45309)!important;border-color:var(--amber-bd,#fde68a)!important;background:var(--amber-bg,#fff7ed)!important}
+        .rem-btn-overdue{color:#fff!important;border-color:var(--red,#dc2626)!important;background:var(--red,#dc2626)!important}
         .rem-list{padding:8px}
         .rem-item{position:relative;padding:9px 30px 9px 11px;border-radius:9px;cursor:pointer;border:1px solid transparent}
         .rem-item:hover{background:var(--bg-2)}
-        .rem-item.active{background:var(--amber-bg,#fff7ed);border-color:var(--amber-bd,#fde68a)}
+        .rem-item.due{background:var(--amber-bg,#fff7ed);border-color:var(--amber-bd,#fde68a)}
+        .rem-item.overdue{background:var(--red-bg,#fef2f2);border-color:var(--red-bd,#fecaca)}
+        .rem-item.overdue .rem-when{color:var(--red,#dc2626)}
         .rem-row1{display:flex;align-items:center;justify-content:space-between}
         .rem-when{font-size:11px;font-weight:800;color:var(--acc)}
-        .rem-item.active .rem-when{color:var(--amber,#b45309)}
+        .rem-item.due .rem-when{color:var(--amber,#b45309)}
         .rem-who{font-size:13px;font-weight:700;color:var(--t1);margin-top:1px}
         .rem-note{font-size:12px;color:var(--t2);margin-top:2px;white-space:pre-wrap;word-break:break-word}
         .rem-done{position:absolute;top:8px;right:8px;width:22px;height:22px;border:1px solid var(--bd);border-radius:6px;background:var(--bg-1);
@@ -1984,13 +1989,15 @@ var App={
     remNote:function(m){return (m&&m.extra&&m.extra['Reminder Note'])||''},
     remDate:function(t){if(!t)return null;var d=new Date(String(t).replace(' ','T'));return isNaN(d)?null:d},
     remActive:function(m){var d=this.remDate(this.remAt(m));return d?d.getTime()<=Date.now():false},
+    remState:function(m){var d=this.remDate(this.remAt(m));if(!d)return '';var diff=Date.now()-d.getTime();
+        if(diff<0)return 'upcoming'; if(diff<=30*60000)return 'due'; return 'overdue'},
     remTimeShort:function(t){var d=this.remDate(t);if(!d)return t;var hh=d.getHours(),mm=d.getMinutes(),ap=hh<12?'AM':'PM',h12=hh%12||12;
         var tm=h12+(mm?':'+('0'+mm).slice(-2):'')+ap;return d.toDateString()===new Date().toDateString()?tm:((d.getMonth()+1)+'/'+d.getDate()+' '+tm)},
     reminderBadge:function(m){var t=this.remAt(m);if(!t)return '';var act=this.remActive(m);
         return ' <span class="rem-badge'+(act?' active':'')+'" title="'+this.esc((this.remNote(m)||'Reminder')+' @ '+this.remTimeShort(t))+'">&#128276; '+this.esc(this.remTimeShort(t))+'</span>'},
-    reminderBell:function(m){var t=this.remAt(m),act=this.remActive(m),has=!!t;
-        var title=has?(this.esc((this.remNote(m)||'Reminder')+' @ '+this.remTimeShort(t))):'Add reminder';
-        return ' <button class="rem-bell'+(has?' has':'')+(act?' active':'')+'" title="'+title+'" onclick="event.stopPropagation();App.openReminderModal(\''+m.id+'\')">&#128276;'+(has?'<span class="rem-bell-t">'+this.esc(this.remTimeShort(t))+'</span>':'')+'</button>'},
+    reminderBell:function(m){var t=this.remAt(m),st=this.remState(m),has=!!t;
+        var title=has?(this.esc((this.remNote(m)||'Reminder')+' @ '+this.remTimeShort(t)+(st==='overdue'?' (overdue)':''))):'Add reminder';
+        return ' <button class="rem-bell'+(has?' has':'')+(st?' '+st:'')+'" title="'+title+'" onclick="event.stopPropagation();App.openReminderModal(\''+m.id+'\')">&#128276;'+(has?'<span class="rem-bell-t">'+this.esc(this.remTimeShort(t))+'</span>':'')+'</button>'},
     openReminderModal:function(id){var m=this.members.find(function(x){return x.id===id||x.memberId===id});if(!m)return;
         this._remModalId=m.id;
         document.getElementById('remModalSub').textContent=' — '+(m.name||m.memberId);
@@ -2019,18 +2026,22 @@ var App={
         if(!this._remTimer)this._remTimer=setInterval(function(){App.renderReminders()},15000);
         var list=(this.members||[]).filter(function(m){return self.remAt(m)});
         list.sort(function(a,b){return String(self.remAt(a)).localeCompare(String(self.remAt(b)))});
-        var due=list.filter(function(m){return self.remActive(m)}).length;
+        var due=list.filter(function(m){return self.remState(m)==='due'}).length;
+        var over=list.filter(function(m){return self.remState(m)==='overdue'}).length;
+        var need=due+over;
         if(btn){ btn.innerHTML='&#128276; Reminders'+(list.length?' ('+list.length+')':'');
             btn.classList.toggle('btn-p', !!this.remOpen);
-            btn.classList.toggle('rem-btn-due', due>0 && !this.remOpen); }
+            btn.classList.toggle('rem-btn-due', due>0 && over===0 && !this.remOpen);
+            btn.classList.toggle('rem-btn-overdue', over>0 && !this.remOpen); }
         if(!this.remOpen){ el.style.display='none'; el.innerHTML=''; return; }
         el.style.display='block';
-        var head='<div class="rem-head">&#128276; Reminders'+(due?' <span class="rem-count">'+due+' due</span>':'')
+        var countHtml=need?' <span class="rem-count'+(over?' overdue':'')+'">'+(over?over+' overdue'+(due?', '+due+' due':''):due+' due')+'</span>':'';
+        var head='<div class="rem-head">&#128276; Reminders'+countHtml
             +'<button class="rem-x" title="Close" onclick="App.toggleReminders()">&times;</button></div>';
-        if(!list.length){ el.innerHTML=head+'<div class="rem-empty">No reminders. Open a patient and set one under &#128276; Reminder.</div>'; return; }
-        el.innerHTML=head+'<div class="rem-list">'+list.map(function(m){var act=self.remActive(m);
-            return '<div class="rem-item'+(act?' active':'')+'" onclick="App.openReminderPatient(\''+m.id+'\')">'
-                +'<div class="rem-row1"><span class="rem-when">'+self.esc(self.remTimeShort(self.remAt(m)))+(act?' • now':'')+'</span>'
+        if(!list.length){ el.innerHTML=head+'<div class="rem-empty">No reminders. Click the &#128276; bell next to a patient to add one.</div>'; return; }
+        el.innerHTML=head+'<div class="rem-list">'+list.map(function(m){var st=self.remState(m);
+            return '<div class="rem-item'+(st?' '+st:'')+'" onclick="App.openReminderPatient(\''+m.id+'\')">'
+                +'<div class="rem-row1"><span class="rem-when">'+self.esc(self.remTimeShort(self.remAt(m)))+(st==='overdue'?' • overdue':st==='due'?' • now':'')+'</span>'
                 +'<button class="rem-done" title="Done / clear" onclick="event.stopPropagation();App.dismissReminder(\''+m.id+'\')">✓</button></div>'
                 +'<div class="rem-who">'+self.esc(m.name||m.memberId)+'</div>'
                 +(self.remNote(m)?'<div class="rem-note">'+self.esc(self.remNote(m))+'</div>':'')
