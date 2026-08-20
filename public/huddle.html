@@ -522,8 +522,11 @@
         .td-chip{font-size:13px;font-weight:800;white-space:nowrap}
         .td-chip.due{color:var(--amber,#b45309)} .td-chip.overdue{color:var(--red,#dc2626)} .td-chip.ok{color:var(--acc)}
         .td-empty{padding:18px 16px;font-size:13px;color:var(--t3)}
-        .td-search{margin-left:auto;width:180px;padding:6px 11px;font-family:var(--font);font-size:12.5px;font-weight:500;
+        .td-search{margin-left:auto;flex:1 1 110px;min-width:90px;max-width:200px;padding:6px 11px;font-family:var(--font);font-size:12.5px;font-weight:500;
             border:1px solid var(--bd);border-radius:7px;background:var(--bg-1);color:var(--t1);outline:none}
+        .td-mini.td-add:hover{color:var(--acc);border-color:var(--acc);background:var(--acc-bg)}
+        .td-hh-actions{padding:9px 14px;border-bottom:1px solid var(--bg-2);flex:none;display:flex}
+        .td-hh-actions .btn{display:inline-flex;align-items:center;gap:6px}
         .td-search:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-bg)}
         .td-search~.td-count{margin-left:10px}
         .td-name .rem-bell{margin-left:8px}
@@ -994,7 +997,7 @@
         <div class="fi"><label>Member ID *</label><input type="text" id="fMemberId" required placeholder="e.g. H12345678"></div>
         <div class="fi"><label>Member Name *</label><input type="text" id="fName" required></div>
         <div class="fi"><label>Metal Tier</label><select id="fTier"><option value="">Select...</option><option>Gold</option><option>Silver</option><option>Bronze</option><option>Copper</option><option>Steel</option></select></div>
-        <div class="fi"><label>Call Type *</label><select id="fCallType" required><option value="">Select...</option><option>Urgent</option><option>TOC x1</option><option>TOC x2</option><option>TOC x3</option><option>TOC F/U</option><option>ICP x1</option><option>ICP x2</option><option>ICP x3</option><option>HRA x1</option><option>HRA x2</option><option>HRA x3</option><option>ICP HRA</option></select></div>
+        <div class="fi"><label>Call Type</label><select id="fCallType"><option value="">None</option><option>Urgent</option><option>TOC x1</option><option>TOC x2</option><option>TOC x3</option><option>TOC F/U</option><option>ICP x1</option><option>ICP x2</option><option>ICP x3</option><option>HRA x1</option><option>HRA x2</option><option>HRA x3</option><option>ICP HRA</option></select></div>
         <div class="fi"><label>CM</label><input type="text" id="fCM" placeholder="Care Manager"></div>
         <div class="fi"><label>Next Call Date</label><input type="date" id="fNextCall"></div>
         <button type="submit" style="display:none">Submit</button>
@@ -2213,6 +2216,39 @@ var App={
         if(m.active===false)this.activateMember(id);else this.deactivateMember(id);
         this.renderToday();
         var s=document.getElementById('tdSearch');if(s&&this._tdQuery){s.focus();s.setSelectionRange(s.value.length,s.value.length)}},
+    /* --- Today: huddle-pending card (search to add/remove, prep all) --- */
+    _tdHhQuery:'',
+    tdPendingList:function(){var self=this;return this.members.filter(function(m){return String(self.hval(m,'Huddle Status')||'').trim().toLowerCase()==='pending'})},
+    tdHhMatches:function(){var self=this,q=(this._tdHhQuery||'').trim().toLowerCase();
+        if(!q)return this.tdPendingList();
+        return this.members.filter(function(m){
+            var hay=(String(self.hName(m)||m.name||'')+' '+String(self.hMemberId(m)||m.memberId||'')+' '+String(self.hCM(m)||m.cm||'')).toLowerCase();
+            return hay.indexOf(q)!==-1})},
+    tdHhRows:function(){var self=this,q=(this._tdHhQuery||'').trim();
+        var list=this.tdHhMatches();
+        if(!list.length)return '<div class="td-empty">'+(q?'No matches':'No pending huddle patients — search above to add some')+'</div>';
+        return list.map(function(m){var nm=self.hName(m)||m.name||m.memberId||'—';
+            var st=String(self.hval(m,'Huddle Status')||'').trim().toLowerCase();
+            var pend=st==='pending';
+            var cm=self.hCM(m)||m.cm||'';
+            return '<div class="td-row" onclick="App.showNotesModal(\''+m.id+'\')">'
+                +'<div class="td-main"><div class="td-name">'+self.esc(nm)+'</div>'
+                +'<div class="td-sub">'+self.esc((cm?cm+' · ':'')+(st||'not in huddle'))+'</div></div>'
+                +'<button class="td-mini'+(pend?'':' td-add')+'" onclick="event.stopPropagation();App.tdSetPending(\''+m.id+'\','+(pend?'false':'true')+')">'+(pend?'Remove':'+ Pending')+'</button>'
+                +'</div>'}).join('')},
+    tdHhSearchInput:function(v){this._tdHhQuery=v||'';var el=document.getElementById('tdHhList');if(el)el.innerHTML=this.tdHhRows();
+        var c=document.getElementById('tdHhCount');if(c){var q=this._tdHhQuery.trim();
+            c.textContent=q?(this.tdHhMatches().length+' found'):String(this.tdPendingList().length)}},
+    tdSetPending:function(id,on){var m=this.members.find(function(x){return x.id===id});if(!m)return;
+        if(on){m=this.ensureHuddleForMember(m)||m;this.setHval(m,'Huddle Status','pending')}
+        else this.setHval(m,'Huddle Status','unused');
+        this.writeMemberCSV();
+        if(this.currentView==='huddle')this.renderHuddle();
+        this.renderToday();
+        var s=document.getElementById('tdHhSearch');if(s&&this._tdHhQuery){s.focus();s.setSelectionRange(s.value.length,s.value.length)}},
+    tdOpenPrep:function(){var rows=this.sortHuddlePDFRows(this.tdPendingList().slice(),'name');
+        if(!rows.length){this.toast('No pending patients to prep','danger');return}
+        this.openHuddlePrepRows(rows)},
     renderToday:function(){
         var el=document.getElementById('todayView');if(!el)return;var self=this;
         var today=this.pacificNowInput().slice(0,10);
@@ -2229,7 +2265,7 @@ var App={
         var dcPin=dueCalls.filter(function(m){var s=self.remState(m);return s==='due'||s==='overdue'});
         if(dcPin.length){dcPin.sort(function(a,b){return String(self.remAt(b)).localeCompare(String(self.remAt(a)))});
             dueCalls=dcPin.concat(dueCalls.filter(function(m){return dcPin.indexOf(m)===-1}));}
-        var pending=this.members.filter(function(m){try{return String(self.hval(m,'Huddle Status')||'').trim().toLowerCase()==='pending'}catch(e){return false}});
+        var pending=this.tdPendingList();
         function row(m,chip,chipCls,sub,click){
             return '<div class="td-row" onclick="'+click+'"><div class="td-main"><div class="td-name">'+self.esc(m.name||m.memberId||'—')+'</div>'
                 +'<div class="td-sub">'+self.esc(sub||'')+'</div></div>'
@@ -2243,8 +2279,6 @@ var App={
         var remRows=remAll.map(function(m){var st=self.remState(m);
             return row(m,self.esc(self.remTimeShort(self.remAt(m)))+(st==='overdue'?' • overdue':st==='due'?' • now':''),
                 st==='upcoming'?'ok':st,self.remNote(m)||'Reminder',"App.openReminderModal('"+m.id+"')");}).join('');
-        var pendRows=pending.map(function(m){var nm='';try{nm=self.hName(m)}catch(e){}if(!nm)nm=m.name||m.memberId;
-            return '<div class="td-row" onclick="App.showNotesModal(\''+m.id+'\')"><div class="td-main"><div class="td-name">'+self.esc(nm)+'</div><div class="td-sub">pending discussion</div></div><span class="td-chip due">huddle</span></div>';}).join('');
         this._tdCalls=dueCalls;
         var callsCard='<div class="td-card warn"><div class="td-card-h">'+this.icon('phone')+' Calls due today'
             +'<input id="tdSearch" class="td-search" type="text" placeholder="Search all members…" value="'+this.esc(this._tdQuery||'')+'" oninput="App.tdSearchInput(this.value)">'
@@ -2254,7 +2288,11 @@ var App={
             +'<div class="td-grid">'
             +'<div class="td-col">'
             +card('Reminders',this.icon('bell'), rem.some(function(m){return self.remState(m)==='overdue'})?'bad':(rem.length?'warn':''), remAll.length, remRows,'No reminders today')
-            +card('Huddle pending',this.icon('target'),'warn',pending.length,pendRows,'No pending huddle patients')
+            +'<div class="td-card warn"><div class="td-card-h">'+this.icon('target')+' Huddle pending'
+            +'<input id="tdHhSearch" class="td-search" type="text" placeholder="Search to add…" value="'+this.esc(this._tdHhQuery||'')+'" oninput="App.tdHhSearchInput(this.value)">'
+            +'<span class="td-count" id="tdHhCount">'+pending.length+'</span></div>'
+            +'<div class="td-hh-actions"><button class="btn btn-sm btn-p" onclick="App.tdOpenPrep()">'+this.icon('target')+' Huddle Prep ('+pending.length+')</button></div>'
+            +'<div class="td-list" id="tdHhList">'+this.tdHhRows()+'</div></div>'
             +'</div>'
             +'<div class="td-col td-right-col">'+callsCard+'</div>'
             +'</div>';
@@ -2684,7 +2722,9 @@ var App={
         var ct=document.getElementById('fCallType').value;
         if(!memberId){this.toast('Member ID required','danger');return false}
         if(!name){this.toast('Name required','danger');return false}
-        if(!ct){this.toast('Select call type','danger');return false}
+        // block duplicate Member IDs (allow saving the same member you're editing)
+        var self=this,dup=this.members.find(function(m){return m.id!==self.editId&&(String(m.memberId||'').trim()===memberId||App.hMemberId(m)===memberId)});
+        if(dup){this.toast('Member ID '+memberId+' already exists ('+(dup.name||this.hName(dup)||'unnamed')+')','danger');return false}
         var cm=document.getElementById('fCM').value.trim();
         var data={memberId:memberId,name:name,tier:tier,callType:ct,nextCall:this.normalizeDate(document.getElementById('fNextCall').value),cm:cm};
         if(this.editId)this.updateMember(this.editId,data);else this.addMember(data);
