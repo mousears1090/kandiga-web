@@ -482,6 +482,31 @@
         .gen-table td{padding:7px 8px;border-bottom:1px solid #f0f1f4;color:var(--t2);vertical-align:middle}
         .gen-table input{width:70px;padding:6px 8px;font-family:var(--font);font-size:13px;background:var(--bg-1);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1)}
         .gen-table .grp-name{font-weight:700;color:var(--t1)}
+        /* reminders */
+        .rem-badge{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:999px;
+            background:var(--bg-3);color:var(--t2);border:1px solid var(--bd);white-space:nowrap;vertical-align:middle}
+        .rem-badge.active{background:var(--amber-bg,#fff7ed);color:var(--amber,#b45309);border-color:var(--amber-bd,#fed7aa);animation:rempulse 1.6s ease-in-out infinite}
+        @keyframes rempulse{0%,100%{opacity:1}50%{opacity:.55}}
+        .rem-panel{position:fixed;right:18px;bottom:18px;width:280px;max-height:60vh;overflow:auto;z-index:900;
+            background:var(--bg-1);border:1px solid var(--bd);border-radius:12px;box-shadow:0 10px 34px rgba(0,0,0,.16);font-family:var(--font)}
+        .rem-head{position:sticky;top:0;background:var(--bg-1);padding:11px 14px;font-size:13px;font-weight:800;color:var(--t1);border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:7px}
+        .rem-count{font-size:10.5px;font-weight:800;color:#fff;background:var(--amber,#b45309);border-radius:999px;padding:1px 8px;vertical-align:middle}
+        .rem-x{margin-left:auto;border:none;background:none;color:var(--t3);font-size:19px;line-height:1;cursor:pointer;padding:0 2px}
+        .rem-x:hover{color:var(--t1)}
+        .rem-empty{padding:16px 14px;font-size:12px;color:var(--t3);line-height:1.5}
+        .rem-btn-due{color:var(--amber,#b45309)!important;border-color:var(--amber-bd,#fde68a)!important;background:var(--amber-bg,#fff7ed)!important}
+        .rem-list{padding:8px}
+        .rem-item{position:relative;padding:9px 30px 9px 11px;border-radius:9px;cursor:pointer;border:1px solid transparent}
+        .rem-item:hover{background:var(--bg-2)}
+        .rem-item.active{background:var(--amber-bg,#fff7ed);border-color:var(--amber-bd,#fde68a)}
+        .rem-row1{display:flex;align-items:center;justify-content:space-between}
+        .rem-when{font-size:11px;font-weight:800;color:var(--acc)}
+        .rem-item.active .rem-when{color:var(--amber,#b45309)}
+        .rem-who{font-size:13px;font-weight:700;color:var(--t1);margin-top:1px}
+        .rem-note{font-size:12px;color:var(--t2);margin-top:2px;white-space:pre-wrap;word-break:break-word}
+        .rem-done{position:absolute;top:8px;right:8px;width:22px;height:22px;border:1px solid var(--bd);border-radius:6px;background:var(--bg-1);
+            color:var(--grn,#16a34a);font-size:12px;cursor:pointer;line-height:1}
+        .rem-done:hover{background:var(--grn-bg,#ecfdf3);border-color:var(--grn,#16a34a)}
     </style>
 </head>
 <body>
@@ -512,6 +537,7 @@
 
 <!-- APP -->
 <div id="app">
+    <div id="remPanel" class="rem-panel" style="display:none"></div>
     <header class="header">
         <div class="header-left">
             <h1>Member<span class="ac">Manager</span></h1>
@@ -549,6 +575,7 @@
         </div>
         <div class="stats" id="stats"></div>
         <button class="btn btn-sm" onclick="App.showSortModal()">Sort</button>
+        <button class="btn btn-sm" onclick="App.resetSort()" title="Reset sorting to default order">&#8635; Default</button>
     </div>
     <div class="filter-bar" id="filterBar">
         <div class="filter-bar-row">
@@ -558,6 +585,7 @@
             <div class="fb-group"><label id="filterDateFromLabel">From</label><input type="date" id="filterDateFrom" onchange="App.applyFilters()"></div>
             <div class="fb-group"><label id="filterDateToLabel">To</label><input type="date" id="filterDateTo" onchange="App.applyFilters()"></div>
             <button class="btn btn-sm" id="reviewFilterBtn" onclick="App.toggleReviewFilter()">Review</button>
+            <button class="btn btn-sm" id="remBtn" onclick="App.toggleReminders()">&#128276; Reminders</button>
             <button class="btn btn-sm" onclick="App.clearFilters()">Clear</button>
         </div>
         <div class="bulk-bar" id="bulkBar" style="display:none">
@@ -1612,6 +1640,7 @@ var App={
                 document.getElementById('badgeM').textContent=self.mFile;
                 var bumped=self.bumpPastDates();
                 self.render();
+                self.renderReminders();
                 self.toast('Ready — changes auto-save to CSV'+(bumped?' (past dates moved to today)':''),'success');
             },300);
         }
@@ -1932,6 +1961,49 @@ var App={
         localStorage.removeItem('memberSortRules');
         this.hideSortModal();this.render();
     },
+    /* ===== REMINDERS (stored in m.extra -> auto-saved to the CSV) ===== */
+    remAt:function(m){return (m&&m.extra&&m.extra['Reminder At'])||''},
+    remNote:function(m){return (m&&m.extra&&m.extra['Reminder Note'])||''},
+    remDate:function(t){if(!t)return null;var d=new Date(String(t).replace(' ','T'));return isNaN(d)?null:d},
+    remActive:function(m){var d=this.remDate(this.remAt(m));return d?d.getTime()<=Date.now():false},
+    remTimeShort:function(t){var d=this.remDate(t);if(!d)return t;var hh=d.getHours(),mm=d.getMinutes(),ap=hh<12?'AM':'PM',h12=hh%12||12;
+        var tm=h12+(mm?':'+('0'+mm).slice(-2):'')+ap;return d.toDateString()===new Date().toDateString()?tm:((d.getMonth()+1)+'/'+d.getDate()+' '+tm)},
+    reminderBadge:function(m){var t=this.remAt(m);if(!t)return '';var act=this.remActive(m);
+        return ' <span class="rem-badge'+(act?' active':'')+'" title="'+this.esc((this.remNote(m)||'Reminder')+' @ '+this.remTimeShort(t))+'">&#128276; '+this.esc(this.remTimeShort(t))+'</span>'},
+    setReminder:function(idOrMid,at,note){var m=this.members.find(function(x){return x.id===idOrMid||x.memberId===idOrMid});if(!m)return;
+        m.extra=m.extra||{};
+        if(at)m.extra['Reminder At']=at;else delete m.extra['Reminder At'];
+        if(note)m.extra['Reminder Note']=note;else delete m.extra['Reminder Note'];
+        this.writeMemberCSV();this.render();this.renderReminders()},
+    updateReminderFromNotes:function(){var a=document.getElementById('nfReminderAt'),n=document.getElementById('nfReminderNote');if(!a)return;
+        this.setReminder(this.notesForId,a.value||'',n?(n.value||''):'')},
+    dismissReminder:function(id){this.setReminder(id,'','')},
+    openReminderPatient:function(id){var m=this.members.find(function(x){return x.id===id});if(m){this.remOpen=false;this.renderReminders();this.showNotesModal(m.id)}},
+    remOpen:false,
+    toggleReminders:function(){this.remOpen=!this.remOpen;this.renderReminders()},
+    renderReminders:function(){
+        var self=this,el=document.getElementById('remPanel'),btn=document.getElementById('remBtn');if(!el)return;
+        if(!this._remTimer)this._remTimer=setInterval(function(){App.renderReminders()},15000);
+        var list=(this.members||[]).filter(function(m){return self.remAt(m)});
+        list.sort(function(a,b){return String(self.remAt(a)).localeCompare(String(self.remAt(b)))});
+        var due=list.filter(function(m){return self.remActive(m)}).length;
+        if(btn){ btn.innerHTML='&#128276; Reminders'+(list.length?' ('+list.length+')':'');
+            btn.classList.toggle('btn-p', !!this.remOpen);
+            btn.classList.toggle('rem-btn-due', due>0 && !this.remOpen); }
+        if(!this.remOpen){ el.style.display='none'; el.innerHTML=''; return; }
+        el.style.display='block';
+        var head='<div class="rem-head">&#128276; Reminders'+(due?' <span class="rem-count">'+due+' due</span>':'')
+            +'<button class="rem-x" title="Close" onclick="App.toggleReminders()">&times;</button></div>';
+        if(!list.length){ el.innerHTML=head+'<div class="rem-empty">No reminders. Open a patient and set one under &#128276; Reminder.</div>'; return; }
+        el.innerHTML=head+'<div class="rem-list">'+list.map(function(m){var act=self.remActive(m);
+            return '<div class="rem-item'+(act?' active':'')+'" onclick="App.openReminderPatient(\''+m.id+'\')">'
+                +'<div class="rem-row1"><span class="rem-when">'+self.esc(self.remTimeShort(self.remAt(m)))+(act?' • now':'')+'</span>'
+                +'<button class="rem-done" title="Done / clear" onclick="event.stopPropagation();App.dismissReminder(\''+m.id+'\')">✓</button></div>'
+                +'<div class="rem-who">'+self.esc(m.name||m.memberId)+'</div>'
+                +(self.remNote(m)?'<div class="rem-note">'+self.esc(self.remNote(m))+'</div>':'')
+                +'</div>';
+        }).join('')+'</div>';
+    },
     applyCustomSort:function(){
         this.sortRules=(this.sortRules||[]).filter(function(r){return r&&r.key});
         if(!this.sortRules.length)this.sortRules=this.defaultSortRules();
@@ -2244,7 +2316,7 @@ var App={
                     return '<tr class="'+(m.active===false?'inactive':'')+(isSel?' selected':'')+'" onclick="App.rowClick(event,\''+m.id+'\')">'
                         +'<td class="cell-check"><input type="checkbox"'+(isSel?' checked':'')+' onclick="event.stopPropagation();App.toggleSelect(\''+m.id+'\',this.checked)"></td>'
                         +'<td class="cell-id">'+self.esc(m.memberId)+' <button class="copy-btn" onclick="event.stopPropagation();App.copyText(\''+self.esc(m.memberId)+'\')" title="Copy Member ID">&#9112;</button></td>'
-                        +'<td class="cell-name">'+self.esc(m.name)+'</td>'
+                        +'<td class="cell-name">'+self.esc(m.name)+self.reminderBadge(m)+'</td>'
                         +'<td><span class="tier '+tc+'">'+self.esc(m.tier)+'</span></td>'
                         +'<td>'+self.esc(m.nextCall)+'</td>'
                         +'<td'+(isUrg?' class="cell-urgent"':'')+'>'+self.esc(m.callType)+'</td>'
@@ -2422,6 +2494,9 @@ var App={
         var reviewChecked=this.isDailyReviewActive(m)?' checked':'';
         document.getElementById('noteFields').innerHTML=dateFields+'<div class="nf-group"><label>Call Type</label><select id="nfCallType" onchange="App.updateFromNotes()"><option value="">Select...</option>'+opts+'</select></div>'
             +'<div class="nf-group"><label>Review</label><label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--t2);text-transform:none;letter-spacing:0;font-weight:600"><input type="checkbox" id="nfDailyReview" onchange="App.updateDailyReviewFromNotes(this.checked)"'+reviewChecked+' style="width:15px;height:15px;accent-color:var(--acc)"> Review during Daily</label></div>';
+        document.getElementById('noteFields').innerHTML+=
+            '<div class="nf-group"><label>&#128276; Reminder</label><input type="datetime-local" id="nfReminderAt" value="'+this.esc((this.remAt(m)||'').replace(' ','T'))+'" onchange="App.updateReminderFromNotes()"></div>'
+            +'<div class="nf-group"><label>Reminder note</label><input type="text" id="nfReminderNote" value="'+this.esc(this.remNote(m))+'" placeholder="e.g. wants a call back" onchange="App.updateReminderFromNotes()"></div>';
         document.getElementById('noteInput').value='';
         document.getElementById('noteActionBtn').textContent='Add Note';
         this.renderNotesList();
