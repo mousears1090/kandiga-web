@@ -499,6 +499,7 @@
         .team-del{margin-left:6px;border:1px solid var(--bd);background:var(--bg-1);color:var(--t3);border-radius:8px;
             padding:6px 8px;cursor:pointer;line-height:1}
         .team-del:hover{color:var(--red,#dc2626);border-color:var(--red,#dc2626);background:var(--red-bg,#fef2f2)}
+        .modal-clock{font-size:13px;font-weight:800;color:var(--t3);font-variant-numeric:tabular-nums;white-space:nowrap}
         /* Today view */
         .today-view{padding:20px 28px 24px;display:flex;flex-direction:column;height:calc(100vh - 128px);overflow:hidden}
         .td-date{font-size:24px;font-weight:800;letter-spacing:-.01em;margin-bottom:16px;flex:none}
@@ -1010,7 +1011,7 @@
 <div class="mo" id="notesModal" onclick="if(event.target===this)App.hideNotesModal()">
     <div class="notes-modal-wrap">
         <div class="modal modal-notes">
-            <div class="mh"><h2>Notes<span class="sub" id="notesSub"></span></h2><div style="display:flex;align-items:center;gap:8px"><button class="btn btn-sm" onclick="App.openHuddlePrepFromNotes()">Huddle Prep</button><button class="mx" onclick="App.hideNotesModal()">&times;</button></div></div>
+            <div class="mh"><h2>Notes<span class="sub" id="notesSub"></span></h2><div style="display:flex;align-items:center;gap:10px"><span class="modal-clock" id="notesClock"></span><button class="btn btn-sm" onclick="App.openHuddlePrepFromNotes()">Huddle Prep</button><button class="mx" onclick="App.hideNotesModal()">&times;</button></div></div>
             <div class="note-info" id="noteInfo"></div>
             <div class="note-fields" id="noteFields"></div>
             <div class="notes-body">
@@ -1067,7 +1068,7 @@
 
 <!-- REMINDER MODAL -->
 <div class="mo" id="reminderModal" onclick="if(event.target===this)App.hideReminderModal()">
-    <div class="modal modal-sm"><div class="mh"><h2><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> Reminder<span class="sub" id="remModalSub" style="font-weight:400;color:var(--t3)"></span></h2><button class="mx" onclick="App.hideReminderModal()">&times;</button></div>
+    <div class="modal modal-sm"><div class="mh"><h2><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> Reminder<span class="sub" id="remModalSub" style="font-weight:400;color:var(--t3)"></span></h2><div style="display:flex;align-items:center;gap:10px"><span class="modal-clock" id="remModalClock"></span><button class="mx" onclick="App.hideReminderModal()">&times;</button></div></div>
     <div class="mb">
         <div class="fi"><label>Date &amp; time</label><input type="datetime-local" id="remModalAt"></div>
         <div class="fi" style="margin-top:12px"><label>Reason</label><input type="text" id="remModalNote" placeholder="e.g. wants a call back at this time"></div>
@@ -1837,7 +1838,7 @@ var App={
     },
 
     bumpPastDates:function(){
-        var today=new Date().toISOString().split('T')[0];
+        var today=App.todayISO();
         var changed=false;
         this.members.forEach(function(m){
             m.nextCall=App.normalizeDate(m.nextCall);
@@ -1870,7 +1871,7 @@ var App={
         var m=this.members.find(function(x){return x.id===id});
         if(!m)return;
         m.active=true;
-        if(!m.nextCall)m.nextCall=new Date().toISOString().split('T')[0];
+        if(!m.nextCall)m.nextCall=App.todayISO();
         this.writeMemberCSV();this.render();this.toast('Member activated','success');
     },
     removeMember:function(id){
@@ -2072,6 +2073,8 @@ var App={
         var mm=t.match(/^(.*?)\s*(AM|PM)$/i),hm=mm?mm[1].trim():t,ap=mm?mm[2]:'';
         el.innerHTML='<span class="pt-time">'+hm+(ap?'<span class="pt-ampm">'+ap+'</span>':'')+'</span><span class="pt-zone">PT</span><span class="pt-date">'+dt+'</span>';
         var tc=document.getElementById('tdClock');if(tc)tc.textContent=t+' PT';
+        var nc=document.getElementById('notesClock');if(nc)nc.textContent=t+' PT';
+        var rc=document.getElementById('remModalClock');if(rc)rc.textContent=t+' PT';
         if(!this._clockTimer)this._clockTimer=setInterval(function(){App.updateClock()},1000)},
     /* ===== inline SVG icons (replaces emoji) ===== */
     icon:function(n){var p={
@@ -2637,7 +2640,7 @@ var App={
     esc:function(s){if(s==null)return'';var d=document.createElement('div');d.textContent=String(s);return d.innerHTML},
     jsArg:function(s){return JSON.stringify(String(s==null?'':s))},
     fmtTime:function(iso){try{var d=new Date(iso);return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+' at '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}catch(e){return iso}},
-    todayISO:function(){return new Date().toISOString().split('T')[0]},
+    todayISO:function(){return this.pacificNowInput().slice(0,10)},   // "today" = Pacific date everywhere
     pad2:function(n){return String(n).padStart(2,'0')},
     dateOnly:function(y,m,d){
         y=parseInt(y,10);m=parseInt(m,10);d=parseInt(d,10);
@@ -2709,7 +2712,7 @@ var App={
             document.getElementById('fMemberId').value=m.memberId;document.getElementById('fName').value=m.name;
             document.getElementById('fTier').value=m.tier;document.getElementById('fCallType').value=m.callType;
             document.getElementById('fCM').value=m.cm||'';document.getElementById('fNextCall').value=m.nextCall;
-        }else{document.getElementById('mForm').reset();document.getElementById('fNextCall').value=new Date().toISOString().split('T')[0]}
+        }else{document.getElementById('mForm').reset();document.getElementById('fNextCall').value=App.todayISO()}
         document.getElementById('memberModal').classList.add('open');this.lockScroll();
         setTimeout(function(){document.getElementById('fMemberId').focus()},50);
     },
@@ -2947,7 +2950,7 @@ var App={
         cols.forEach(function(c,i){ctOpts+='<option value="'+i+'">'+self.esc(c)+'</option>'});
         document.getElementById('importCTCol').innerHTML=ctOpts;
         document.getElementById('importCTMap').innerHTML='<div style="color:var(--t3);font-size:12px">All rows will use the fallback Call Type</div>';
-        document.getElementById('importNextCall').value=new Date().toISOString().split('T')[0];
+        document.getElementById('importNextCall').value=App.todayISO();
         document.getElementById('importCallType').value='';
         this.renderProtectRules();
         this.applyImportSettings();
@@ -3297,7 +3300,7 @@ var App={
     renderHuddle:function(){
         this.ensureHuddleControls();
         this.saveHuddleViewSettings();
-        var rows=this.huddleRows(),all=this.members.filter(function(m){return App.isInHuddle(m)}),today=new Date().toISOString().split('T')[0];
+        var rows=this.huddleRows(),all=this.members.filter(function(m){return App.isInHuddle(m)}),today=App.todayISO();
         var unused=all.filter(function(m){return App.huddleStatus(m)==='unused'}).length;
         var pending=all.filter(function(m){return App.huddleStatus(m)==='pending'}).length;
         var used=all.filter(function(m){return App.huddleStatus(m)==='used'}).length;
@@ -3661,7 +3664,7 @@ var App={
         this.writeMemberCSV();this.render();this.renderHuddle();this.hideImportModal();
         this.toast(added+' added, '+updated+' updated'+(skipped?', '+skipped+' skipped':''),'success');
     },
-    finalizePendingHuddle:function(){var today=new Date().toISOString().split('T')[0],n=0;this.members.forEach(function(m){if(App.huddleStatus(m)==='pending'){App.setHval(m,'Huddle Status','used');App.setHval(m,'Last Discussed',today);App.setHval(m,'Times Discussed',String(parseInt(App.hval(m,'Times Discussed')||'0',10)+1));n++}});if(n)this.writeMemberCSV();return n},
+    finalizePendingHuddle:function(){var today=App.todayISO(),n=0;this.members.forEach(function(m){if(App.huddleStatus(m)==='pending'){App.setHval(m,'Huddle Status','used');App.setHval(m,'Last Discussed',today);App.setHval(m,'Times Discussed',String(parseInt(App.hval(m,'Times Discussed')||'0',10)+1));n++}});if(n)this.writeMemberCSV();return n},
     getHuddlePDFDefaults:function(){
         return {
             version:2,
@@ -5255,6 +5258,11 @@ var App={
 };
 
 App.init();
+/* keep the Today view in sync: every data change already calls App.render(),
+   so re-render Today whenever it's the active view */
+(function(){var _r=App.render.bind(App);
+    App.render=function(){var out=_r();try{if(App.currentView==='today')App.renderToday()}catch(e){}return out};
+})();
 </script>
 </body>
 </html>
