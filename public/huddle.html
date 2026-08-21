@@ -500,6 +500,9 @@
             padding:6px 8px;cursor:pointer;line-height:1}
         .team-del:hover{color:var(--red,#dc2626);border-color:var(--red,#dc2626);background:var(--red-bg,#fef2f2)}
         .modal-clock{font-size:13px;font-weight:800;color:var(--t3);font-variant-numeric:tabular-nums;white-space:nowrap}
+        .resume-btn{margin-top:10px;width:100%;border-color:var(--acc)!important;color:var(--acc)!important;font-weight:700;
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .resume-btn:hover{background:var(--acc-bg)!important}
         /* Today view */
         .today-view{padding:20px 28px 24px;display:flex;flex-direction:column;height:calc(100vh - 128px);overflow:hidden}
         .td-date{font-size:24px;font-weight:800;letter-spacing:-.01em;margin-bottom:16px;flex:none}
@@ -601,6 +604,7 @@
                 <button class="btn btn-p" onclick="event.stopPropagation();App.openMemberFile()">Open</button>
                 <button class="btn" onclick="event.stopPropagation();App.createMemberFile()">New</button>
             </div>
+            <button class="btn resume-btn" id="resumeBtn" style="display:none" onclick="event.stopPropagation();App.resumeSavedFile()"></button>
         </div>
     </div>
     <div class="setup-err" id="setupErr"></div>
@@ -1642,9 +1646,13 @@ var App={
     openMemberFile:function(){
         var self=this;
         window.showOpenFilePicker({types:[{description:'CSV or Excel',accept:{'text/csv':['.csv'],'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx','.xls']}}]}).then(function(handles){
-            self.mHandle=handles[0];
-            return self.mHandle.getFile();
-        }).then(function(file){
+            FileMem.save(handles[0]);                 // remember for one-click reopen next time
+            return self.loadFromHandle(handles[0]);
+        }).catch(function(e){if(e.name!=='AbortError')self.showErr(e.message)});
+    },
+    loadFromHandle:function(handle){
+        var self=this;self.mHandle=handle;
+        return handle.getFile().then(function(file){
             self.mFile=file.name;
             if(file.name.toLowerCase().endsWith('.xlsx')||file.name.toLowerCase().endsWith('.xls')){
                 return file.arrayBuffer().then(function(buf){
@@ -1658,13 +1666,30 @@ var App={
             return file.text();
         }).then(function(text){
             if(text){self.parseMemberCSV(text);self.checkReady()}
-        }).catch(function(e){if(e.name!=='AbortError')self.showErr(e.message)});
+        });
+    },
+    resumeSavedFile:function(){
+        var self=this;
+        FileMem.load().then(function(h){
+            if(!h){self.toast('No saved file — use Open','danger');return}
+            var q=h.queryPermission?h.queryPermission({mode:'readwrite'}):Promise.resolve('prompt');
+            return Promise.resolve(q).then(function(p){return p==='granted'?p:h.requestPermission({mode:'readwrite'})}).then(function(p){
+                if(p!=='granted'){self.toast('Permission not granted','danger');return}
+                FileMem.save(h);
+                return self.loadFromHandle(h);
+            });
+        }).catch(function(e){
+            if(e&&e.name==='NotFoundError'){FileMem.clear();
+                var b=document.getElementById('resumeBtn');if(b)b.style.display='none';
+                self.showErr('The saved file was moved or deleted — open it again');}
+            else if(e&&e.name!=='AbortError')self.showErr(e.message||String(e));
+        });
     },
 
     createMemberFile:function(){
         var self=this;
         window.showSaveFilePicker({suggestedName:'members.csv',types:[{description:'CSV',accept:{'text/csv':['.csv']}}]}).then(function(handle){
-            self.mHandle=handle;self.mFile=handle.name;
+            self.mHandle=handle;self.mFile=handle.name;FileMem.save(handle);
             self.members=[];self.notes=[];self.nextMid=1;self.nextNid=1;
             return self.writeMemberCSV();
         }).then(function(){
@@ -1734,6 +1759,7 @@ var App={
                 self.buildTeamSelect();
                 var bumped=self.bumpPastDates();
                 self.render();
+                self.setView('today');   // land on Today, not the table
                 self.updateClock();
                 self.renderReminders();
                 self.toast('Ready — changes auto-save to CSV'+(bumped?' (past dates moved to today)':''),'success');
@@ -5257,7 +5283,24 @@ var App={
     }
 };
 
+/* Remember the CSV's file handle so reopening is one click (file handles can only
+   live in IndexedDB — localStorage can't hold them). Stores a POINTER to the file,
+   not your data; the CSV itself stays the only data store. */
+var FileMem={
+    db:function(){return new Promise(function(res,rej){var r=indexedDB.open('mm-file-handle',1);
+        r.onupgradeneeded=function(){r.result.createObjectStore('h')};
+        r.onsuccess=function(){res(r.result)};r.onerror=function(){rej(r.error)}})},
+    save:function(h){FileMem.db().then(function(d){var t=d.transaction('h','readwrite');t.objectStore('h').put(h,'member')}).catch(function(){})},
+    load:function(){return FileMem.db().then(function(d){return new Promise(function(res){
+        var g=d.transaction('h','readonly').objectStore('h').get('member');
+        g.onsuccess=function(){res(g.result||null)};g.onerror=function(){res(null)}})}).catch(function(){return null})},
+    clear:function(){FileMem.db().then(function(d){var t=d.transaction('h','readwrite');t.objectStore('h').delete('member')}).catch(function(){})}
+};
 App.init();
+/* offer one-click reopen of the last CSV on the setup screen */
+FileMem.load().then(function(h){if(!h)return;
+    var b=document.getElementById('resumeBtn');
+    if(b){b.textContent='↻ Continue with '+(h.name||'last file');b.style.display='block'}});
 /* keep the Today view in sync: every data change already calls App.render(),
    so re-render Today whenever it's the active view */
 (function(){var _r=App.render.bind(App);
