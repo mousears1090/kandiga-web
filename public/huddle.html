@@ -1077,7 +1077,7 @@
         <div class="fi"><label>Date &amp; time</label><input type="datetime-local" id="remModalAt"></div>
         <div class="fi" style="margin-top:12px"><label>Reason</label><input type="text" id="remModalNote" placeholder="e.g. wants a call back at this time"></div>
     </div>
-    <div class="mf"><button class="btn btn-d" id="remModalComplete" style="display:none" onclick="App.completeReminderFromModal()">&#10003; Complete</button><span style="flex:1"></span><button class="btn" onclick="App.hideReminderModal()">Cancel</button><button class="btn btn-p" onclick="App.saveReminderFromModal()">Save</button></div>
+    <div class="mf"><button class="btn" onclick="App.openChartFromReminder()">Open Chart</button><button class="btn btn-d" id="remModalComplete" style="display:none" onclick="App.completeReminderFromModal()">&#10003; Complete</button><span style="flex:1"></span><button class="btn" onclick="App.hideReminderModal()">Cancel</button><button class="btn btn-p" onclick="App.saveReminderFromModal()">Save</button></div>
     </div>
 </div>
 
@@ -2175,6 +2175,9 @@ var App={
     saveReminderFromModal:function(){var at=document.getElementById('remModalAt').value||'',note=document.getElementById('remModalNote').value||'';
         this.setReminder(this._remModalId,at,note);this.hideReminderModal();this.toast(at?'Reminder saved':'Reminder cleared','success')},
     completeReminderFromModal:function(){this.setReminder(this._remModalId,'','');this.hideReminderModal();this.toast('Reminder completed','success')},
+    openChartFromReminder:function(){var id=this._remModalId;if(!id)return;
+        this._returnToReminder=id;                     // closing the chart brings the reminder back
+        this.hideReminderModal();this.showNotesModal(id)},
     setReminder:function(idOrMid,at,note){var m=this.members.find(function(x){return x.id===idOrMid||x.memberId===idOrMid});if(!m)return;
         m.extra=m.extra||{};
         if(at)m.extra['Reminder At']=at;else delete m.extra['Reminder At'];
@@ -2887,6 +2890,7 @@ var App={
         this.editingNoteId=null;
         document.getElementById('notesModal').classList.remove('open');this.unlockScroll();this.notesForId=null;
         if(this._returnToCalDay){this._returnToCalDay=false;this.renderCalendarMembers()}
+        if(this._returnToReminder){var rid=this._returnToReminder;this._returnToReminder=null;this.openReminderModal(rid)}
     },
     _returnToCalDay:false,
     openNotesFromCal:function(id){
