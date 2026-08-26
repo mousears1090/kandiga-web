@@ -1031,7 +1031,7 @@
 <div class="mo" id="notesModal" onclick="if(event.target===this)App.hideNotesModal()">
     <div class="notes-modal-wrap">
         <div class="modal modal-notes">
-            <div class="mh"><h2>Notes<span class="sub" id="notesSub"></span></h2><div style="display:flex;align-items:center;gap:10px"><span class="modal-clock" id="notesClock"></span><button class="btn btn-sm" onclick="App.openHuddlePrepFromNotes()">Huddle Prep</button><button class="mx" onclick="App.hideNotesModal()">&times;</button></div></div>
+            <div class="mh"><h2>Notes<span class="sub" id="notesSub"></span></h2><div style="display:flex;align-items:center;gap:10px"><span class="modal-clock" id="notesClock"></span><button class="mh-icobtn" title="Reminder" onclick="App.openReminderFromChart()"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button><button class="btn btn-sm" onclick="App.openHuddlePrepFromNotes()">Huddle Prep</button><button class="mx" onclick="App.hideNotesModal()">&times;</button></div></div>
             <div class="note-info" id="noteInfo"></div>
             <div class="note-fields" id="noteFields"></div>
             <div class="notes-body">
@@ -2259,13 +2259,20 @@ var App={
         var comp=document.getElementById('remModalComplete');if(comp)comp.style.display=this.remAt(m)?'':'none';
         document.getElementById('reminderModal').classList.add('open');this.lockScroll();
         var at=document.getElementById('remModalAt');setTimeout(function(){at.focus()},50)},
-    hideReminderModal:function(){document.getElementById('reminderModal').classList.remove('open');this.unlockScroll();this._remModalId=null},
+    hideReminderModal:function(){document.getElementById('reminderModal').classList.remove('open');this.unlockScroll();this._remModalId=null;
+        if(this._returnToChart){var cid=this._returnToChart;this._returnToChart=null;this.showNotesModal(cid)}},
     saveReminderFromModal:function(){var at=document.getElementById('remModalAt').value||'',note=document.getElementById('remModalNote').value||'';
         this.setReminder(this._remModalId,at,note);this.hideReminderModal();this.toast(at?'Reminder saved':'Reminder cleared','success')},
     completeReminderFromModal:function(){this.setReminder(this._remModalId,'','');this.hideReminderModal();this.toast('Reminder completed','success')},
     openChartFromReminder:function(){var id=this._remModalId;if(!id)return;
+        this._returnToChart=null;                      // avoid ping-pong loops
         this._returnToReminder=id;                     // closing the chart brings the reminder back
         this.hideReminderModal();this.showNotesModal(id)},
+    openReminderFromChart:function(){
+        var m=this.findMemberByAnyId(this.notesForId);if(!m){this.toast('No patient open','danger');return}
+        this._returnToReminder=null;                   // suppress the chart-close return logic
+        this._returnToChart=m.id;                      // closing the reminder brings the chart back
+        this.hideNotesModal();this.openReminderModal(m.id)},
     setReminder:function(idOrMid,at,note){var m=this.members.find(function(x){return x.id===idOrMid||x.memberId===idOrMid});if(!m)return;
         m.extra=m.extra||{};
         if(at)m.extra['Reminder At']=at;else delete m.extra['Reminder At'];
