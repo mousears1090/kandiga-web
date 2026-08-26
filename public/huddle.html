@@ -1729,6 +1729,8 @@ var App={
         var needHints=this.members.some(function(m){return m.hintTitle||m.hintValue});
         if(needHints&&this.hintTitleCol<0){this.hintTitleCol=7;this.hintLabelCol=8;this.hintCol=9}
         var layout=this.buildCSVLayout();
+        var settingsJson=this.appSettingsJson();
+        if(settingsJson)uniqPush(layout.member,'App Settings');
         this.memberHeaders=layout.member;this.huddleHeaders=layout.huddle;
         var header=layout.member.concat(['','','','','']).concat(layout.huddle);
         var csv=header.map(csvF).join(',')+'\n';
@@ -1752,6 +1754,11 @@ var App={
             });
             csv+=vals.map(csvF).join(',')+'\n';
         });
+        // Settings row (sort presets etc.) — one row, only the App Settings cell filled
+        if(settingsJson){
+            var si=header.indexOf('App Settings');
+            if(si>=0){var sv=new Array(totalCols).fill('');sv[si]=settingsJson;csv+=sv.map(csvF).join(',')+'\n'}
+        }
         var handle=this.mHandle;
         return handle.createWritable().then(function(w){return w.write(csv).then(function(){return w.close()})}).then(function(){self.confirmSaved('CSV saved')}).catch(function(e){self.toast('Save failed: '+(e&&e.message?e.message:e),'danger');throw e});
     },
@@ -1840,9 +1847,11 @@ var App={
         // Find hint column indexes
         this.hintTitleCol=-1;this.hintLabelCol=-1;this.hintCol=-1;
         // Find note column indexes
-        this.noteMemberIdCol=-1;this.noteTimestampCol=-1;this.noteCol=-1;this.activeCol=-1;
+        this.noteMemberIdCol=-1;this.noteTimestampCol=-1;this.noteCol=-1;this.activeCol=-1;this.settingsCol=-1;
+        this.appSettings={};
         for(var c=0;c<headers.length;c++){
             var lc=headers[c].toLowerCase();
+            if(lc==='app settings')this.settingsCol=c;
             if(lc==='hinttitle')this.hintTitleCol=c;
             if(lc==='hintlabel')this.hintLabelCol=c;
             if(lc==='hint')this.hintCol=c;
@@ -1861,6 +1870,9 @@ var App={
             if(!hasHuddleData)(self.huddleHeaders||[]).forEach(function(h){if(rowObj[h]&&String(rowObj[h]).trim())hasHuddleData=true});
             var noteMid=self.noteMemberIdCol>=0?(r[self.noteMemberIdCol]||'').trim():'';
             var noteText=self.noteCol>=0?(r[self.noteCol]||'').trim():'';
+            // settings row: only the App Settings cell is meaningful — consume, don't make a member
+            var settingsVal=self.settingsCol>=0?(r[self.settingsCol]||'').trim():'';
+            if(settingsVal&&!memberId&&!noteText){try{self.appSettings=JSON.parse(settingsVal)||{}}catch(e){}return}
             // If row has noteMemberID and note filled but no member name → it's a note row
             if(noteMid&&noteText&&!memberId){
                 var ts=self.noteTimestampCol>=0?(r[self.noteTimestampCol]||'').trim():'';
@@ -1885,6 +1897,11 @@ var App={
         this.normalizeAllDates();
         var mx=0;this.members.forEach(function(m){var n=parseInt(m.id);if(!isNaN(n)&&n>mx)mx=n});this.nextMid=mx+1;
         var nmx=0;this.notes.forEach(function(n){var v=parseInt(n.id);if(!isNaN(v)&&v>nmx)nmx=v});this.nextNid=nmx+1;
+        // settings stored in the CSV win over any local cache
+        if(this.appSettings&&Array.isArray(this.appSettings.sortRules)&&this.appSettings.sortRules.length){
+            this.sortRules=JSON.parse(JSON.stringify(this.appSettings.sortRules));
+            this.sortMode='custom';this.manualSort=true;this.sortCol='custom';
+        }
     },
 
     bumpPastDates:function(){
@@ -1997,10 +2014,21 @@ var App={
             return Array.isArray(rules)&&rules.length?rules:this.defaultSortRules();
         }catch(e){return this.defaultSortRules()}
     },
-    saveSortRules:function(){localStorage.setItem('memberSortRules',JSON.stringify(this.sortRules||[]))},
-    /* ===== named sort presets — one click to re-apply a saved custom sort ===== */
-    getSortPresets:function(){try{var p=JSON.parse(localStorage.getItem('mm_sort_presets')||'[]');return Array.isArray(p)?p:[]}catch(e){return[]}},
-    setSortPresets:function(p){localStorage.setItem('mm_sort_presets',JSON.stringify(p||[]))},
+    saveSortRules:function(){localStorage.setItem('memberSortRules',JSON.stringify(this.sortRules||[]));
+        this.appSettings=this.appSettings||{};this.appSettings.sortRules=JSON.parse(JSON.stringify(this.sortRules||[]));this.writeMemberCSV()},
+    /* ===== named sort presets — stored IN the CSV (App Settings row), so they travel with the file ===== */
+    appSettings:{},
+    appSettingsJson:function(){var s=this.appSettings||{};return Object.keys(s).some(function(k){var v=s[k];return v&&(Array.isArray(v)?v.length:true)})?JSON.stringify(s):''},
+    getSortPresets:function(){
+        this.appSettings=this.appSettings||{};
+        if(!Array.isArray(this.appSettings.sortPresets)){
+            // one-time migration from the old localStorage location
+            try{var old=JSON.parse(localStorage.getItem('mm_sort_presets')||'null');
+                if(Array.isArray(old)&&old.length){this.appSettings.sortPresets=old;localStorage.removeItem('mm_sort_presets');this.writeMemberCSV()}}catch(e){}
+        }
+        return Array.isArray(this.appSettings.sortPresets)?this.appSettings.sortPresets:[];
+    },
+    setSortPresets:function(p){this.appSettings=this.appSettings||{};this.appSettings.sortPresets=p||[];this.writeMemberCSV()},
     renderSortPresets:function(){
         var el=document.getElementById('sortPresets');if(!el)return;var self=this,p=this.getSortPresets();
         if(!p.length){el.innerHTML='<div class="sort-preset-empty">None yet — build rules below, then save them with a name.</div>';return}
@@ -2139,6 +2167,7 @@ var App={
     resetSort:function(){
         this.sortRules=this.defaultSortRules();this.sortMode='default';this.manualSort=false;this.sortCol='default';this.sortDir='asc';
         localStorage.removeItem('memberSortRules');
+        if(this.appSettings&&this.appSettings.sortRules){delete this.appSettings.sortRules;this.writeMemberCSV()}
         this.hideSortModal();this.render();
     },
     /* ===== REMINDERS (stored in m.extra -> auto-saved to the CSV) ===== */
