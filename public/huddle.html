@@ -503,6 +503,19 @@
         .mh-icobtn{border:1px solid var(--bd);background:var(--bg-1);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--t2);line-height:1}
         .mh-icobtn:hover{color:var(--acc);border-color:var(--acc);background:var(--acc-bg)}
         .mh-icobtn .ic{width:15px;height:15px;vertical-align:-2px}
+        /* saved sort presets */
+        .sort-presets-wrap{margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--bd)}
+        .sort-presets-label{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:7px}
+        .sort-presets{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:9px}
+        .sort-preset-empty{font-size:12px;color:var(--t3)}
+        .sort-chip{display:inline-flex;align-items:stretch;border:1px solid var(--bd);border-radius:999px;overflow:hidden;background:var(--bg-1)}
+        .sort-chip-apply{border:none;background:none;cursor:pointer;font-family:var(--font);font-size:12.5px;font-weight:700;color:var(--t1);padding:5px 4px 5px 12px}
+        .sort-chip-apply:hover{color:var(--acc)}
+        .sort-chip-x{border:none;background:none;cursor:pointer;color:var(--t3);font-size:14px;line-height:1;padding:0 9px 0 5px}
+        .sort-chip-x:hover{color:var(--red,#dc2626)}
+        .sort-preset-save{display:flex;gap:8px}
+        .sort-preset-save input{flex:1;min-width:0;padding:7px 10px;font-family:var(--font);font-size:12.5px;border:1px solid var(--bd);border-radius:7px;background:var(--bg-1);color:var(--t1);outline:none}
+        .sort-preset-save input:focus{border-color:var(--acc)}
         .resume-btn{margin-top:10px;width:100%;border-color:var(--acc)!important;color:var(--acc)!important;font-weight:700;
             white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .resume-btn:hover{background:var(--acc-bg)!important}
@@ -1057,6 +1070,14 @@
     <div class="modal modal-sm">
         <div class="mh"><h2>Sort Members</h2><button class="mx" onclick="App.hideSortModal()">&times;</button></div>
         <div class="mb">
+            <div class="sort-presets-wrap">
+                <div class="sort-presets-label">Saved sorts</div>
+                <div id="sortPresets" class="sort-presets"></div>
+                <div class="sort-preset-save">
+                    <input type="text" id="sortPresetName" placeholder="Name this sort (e.g. TOC first)" onkeydown="if(event.key==='Enter'){event.preventDefault();App.saveCurrentSortPreset()}">
+                    <button class="btn btn-sm" onclick="App.saveCurrentSortPreset()">Save current</button>
+                </div>
+            </div>
             <p class="sort-help">Add rules in priority order. Custom rules use dropdowns from the values already in this list.</p>
             <div id="sortRules"></div>
             <button class="btn btn-sm" onclick="App.addSortRule()" style="margin-top:10px">+ Add Rule</button>
@@ -1977,6 +1998,40 @@ var App={
         }catch(e){return this.defaultSortRules()}
     },
     saveSortRules:function(){localStorage.setItem('memberSortRules',JSON.stringify(this.sortRules||[]))},
+    /* ===== named sort presets — one click to re-apply a saved custom sort ===== */
+    getSortPresets:function(){try{var p=JSON.parse(localStorage.getItem('mm_sort_presets')||'[]');return Array.isArray(p)?p:[]}catch(e){return[]}},
+    setSortPresets:function(p){localStorage.setItem('mm_sort_presets',JSON.stringify(p||[]))},
+    renderSortPresets:function(){
+        var el=document.getElementById('sortPresets');if(!el)return;var self=this,p=this.getSortPresets();
+        if(!p.length){el.innerHTML='<div class="sort-preset-empty">None yet — build rules below, then save them with a name.</div>';return}
+        el.innerHTML=p.map(function(x,i){
+            return '<span class="sort-chip"><button class="sort-chip-apply" title="Apply this sort" onclick="App.applySortPreset('+i+')">'+self.esc(x.name)+'</button>'
+                +'<button class="sort-chip-x" title="Delete preset" onclick="App.deleteSortPreset('+i+')">&times;</button></span>';
+        }).join('');
+    },
+    saveCurrentSortPreset:function(){
+        var inp=document.getElementById('sortPresetName');var name=(inp&&inp.value||'').trim();
+        if(!name){this.toast('Give the sort a name first','danger');return}
+        var rules=(this.sortRules||[]).filter(function(r){return r&&r.key});
+        if(!rules.length){this.toast('Add at least one rule below first','danger');return}
+        var p=this.getSortPresets();
+        var i=p.findIndex(function(x){return x.name.toLowerCase()===name.toLowerCase()});
+        var entry={name:name,rules:JSON.parse(JSON.stringify(rules))};
+        if(i!==-1)p[i]=entry;else p.push(entry);
+        this.setSortPresets(p);if(inp)inp.value='';this.renderSortPresets();
+        this.toast(i!==-1?('Updated "'+name+'"'):('Saved "'+name+'"'),'success');
+    },
+    applySortPreset:function(i){
+        var p=this.getSortPresets();if(!p[i])return;
+        this.sortRules=JSON.parse(JSON.stringify(p[i].rules));
+        this.applyCustomSort();
+        this.toast('Sorted by "'+p[i].name+'"','success');
+    },
+    deleteSortPreset:function(i){
+        var p=this.getSortPresets();if(!p[i])return;
+        if(!confirm('Delete saved sort "'+p[i].name+'"?'))return;
+        p.splice(i,1);this.setSortPresets(p);this.renderSortPresets();
+    },
     sort:function(col){
         if(this.sortCol===col)this.sortDir=this.sortDir==='asc'?'desc':'asc';
         else{this.sortCol=col;this.sortDir='asc'}
@@ -1987,6 +2042,7 @@ var App={
     showSortModal:function(){
         if(!this.sortRules||!this.sortRules.length)this.sortRules=this.defaultSortRules();
         this.renderSortRules();
+        this.renderSortPresets();
         document.getElementById('sortModal').classList.add('open');this.lockScroll();
     },
     hideSortModal:function(){document.getElementById('sortModal').classList.remove('open');this.unlockScroll()},
