@@ -535,6 +535,15 @@
         .fh-warn{background:#fef3c7;border:1px solid #f59e0b;color:#92400e;border-radius:var(--r);padding:10px 12px;font-size:13px;margin-bottom:12px}
         .fh-ok{background:#ecfdf5;border:1px solid #10b981;color:#065f46;border-radius:var(--r);padding:10px 12px;font-size:13px;margin-bottom:12px}
         .fh-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+        .setup-repair{margin-top:26px;text-align:center}
+        .setup-repair .btn .ic{width:14px;height:14px;vertical-align:-2px;margin-right:4px}
+        .setup-repair p{font-size:12px;color:var(--t3);margin:8px auto 0;max-width:420px}
+        .rp-issue{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--bd);border-radius:var(--r);margin-bottom:8px;background:var(--bg-2)}
+        .rp-issue input{margin-top:3px}
+        .rp-issue b{color:var(--t1)}
+        .rp-issue small{display:block;color:var(--t3);font-size:12px;margin-top:2px}
+        .rp-issue.bad{border-color:#f59e0b;background:#fffbeb}
+        .rp-result{background:#ecfdf5;border:1px solid #10b981;color:#065f46;border-radius:var(--r);padding:12px;font-size:13px;margin-top:12px}
         .resume-btn{margin-top:10px;width:100%;border-color:var(--acc)!important;color:var(--acc)!important;font-weight:700;
             white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .resume-btn:hover{background:var(--acc-bg)!important}
@@ -642,7 +651,20 @@
             <button class="btn resume-btn" id="resumeBtn" style="display:none" onclick="event.stopPropagation();App.resumeSavedFile()"></button>
         </div>
     </div>
+    <div class="setup-repair">
+        <button class="btn" onclick="App.repairPickFile()"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> Check &amp; repair a CSV</button>
+        <p>For a file that has grown huge or won't open. Scans it <b>without loading it</b>, shows what's wrong, and fixes it.</p>
+    </div>
     <div class="setup-err" id="setupErr"></div>
+</div>
+
+<!-- REPAIR MODAL (start screen — works on the raw file, never loads patients) -->
+<div class="mo" id="repairModal">
+    <div class="modal" style="max-width:760px">
+        <div class="mh"><h2>Check &amp; Repair</h2><button class="mx" onclick="App.hideRepair()">&times;</button></div>
+        <div class="mb" id="repairBody"></div>
+        <div class="mf" id="repairFoot"><span style="flex:1"></span><button class="btn" onclick="App.hideRepair()">Close</button></div>
+    </div>
 </div>
 
 <!-- APP -->
@@ -1684,6 +1706,34 @@ function parseCSV(text){
     row.push(f);if(row.length>1||row.some(function(x){return x.trim()}))rows.push(row);
     return rows;
 }
+/* Streaming CSV scanner: calls onRow(fields,rowIndex) per record without building the whole table.
+   Handles quotes, "" escapes, commas/newlines inside quotes, CRLF. Return false from onRow to stop. */
+function csvScan(text,onRow,firstOnly){
+    var n=text.length,i=0,row=[],rowIdx=0,f,c,s,buf,closed;
+    while(i<n){
+        if(text.charCodeAt(i)===34){
+            i++;buf='';s=i;closed=false;
+            while(i<n){c=text.charCodeAt(i);
+                if(c===34){if(text.charCodeAt(i+1)===34){buf+=text.slice(s,i)+'"';i+=2;s=i;continue}buf+=text.slice(s,i);i++;closed=true;break}
+                i++}
+            if(!closed)buf+=text.slice(s,n);
+            f=buf;
+            while(i<n){c=text.charCodeAt(i);if(c===44||c===10||c===13)break;i++}
+        }else{
+            s=i;while(i<n){c=text.charCodeAt(i);if(c===44||c===10||c===13)break;i++}
+            f=text.slice(s,i);
+        }
+        row.push(f);
+        c=i<n?text.charCodeAt(i):-1;
+        if(c===44){i++;if(i>=n)row.push('');continue}
+        if(c===13){i++;if(text.charCodeAt(i)===10)i++}else if(c===10){i++}
+        if(!(row.length===1&&row[0]==='')){if(onRow(row,rowIdx++)===false)return;if(firstOnly)return}
+        row=[];
+    }
+    if(row.length&&!(row.length===1&&row[0]===''))onRow(row,rowIdx++);
+}
+function csvHeaderOf(text){var h=null;csvScan(text,function(r){h=r.map(function(x){return x.trim()});return false},true);return h||[]}
+function isRunawayCol(h){return /^\[[^\]]*\]\s*\[/.test(h||'')}
 function csvF(v){v=String(v==null?'':v);return(v.indexOf(',')>-1||v.indexOf('"')>-1||v.indexOf('\n')>-1||v.indexOf('\r')>-1)?'"'+v.replace(/"/g,'""')+'"':v}
 
 var App={
@@ -1718,7 +1768,10 @@ var App={
             }
             return file.text();
         }).then(function(text){
-            if(text){self.parseMemberCSV(text);self.checkReady()}
+            if(!text)return;
+            var bad=csvHeaderOf(text).filter(isRunawayCol).length;
+            if(bad>50&&confirm('This file has '+bad.toLocaleString()+' runaway team columns and may freeze if loaded.\n\nRun Check & Repair on it instead? (Recommended)'))return self.repairFromHandle(handle);
+            self.parseMemberCSV(text);self.checkReady();
         });
     },
     resumeSavedFile:function(){
@@ -1850,9 +1903,9 @@ var App={
     buildCSVLayout:function(){
         var mh=[],hh=[],self=this,hset={};
         (this.huddleHeaders||[]).forEach(function(h){if(h)hset[h]=true});
-        (this.csvHeaders||[]).forEach(function(h){if(!h)return;if(isHuddleCol(h)||hset[h])uniqPush(hh,h);else uniqPush(mh,h)});
+        (this.csvHeaders||[]).forEach(function(h){if(!h)return;if(h.charAt(0)!=='['&&(isHuddleCol(h)||hset[h]))uniqPush(hh,h);else uniqPush(mh,h)});
         MEMBER_COL_DEFAULTS.forEach(function(h){uniqPush(mh,h)});
-        this.members.forEach(function(m){Object.keys(m.extra||{}).forEach(function(h){if(isHuddleCol(h)||hset[h])uniqPush(hh,h);else uniqPush(mh,h)})});
+        this.members.forEach(function(m){Object.keys(m.extra||{}).forEach(function(h){if(h.charAt(0)!=='['&&(isHuddleCol(h)||hset[h]))uniqPush(hh,h);else uniqPush(mh,h)})});
         HUDDLE_ID_COLS.concat(HUDDLE_COLS).concat(HUDDLE_PREP_COLS).forEach(function(h){uniqPush(hh,h)});
         if(!mh.length)mh=MEMBER_COL_DEFAULTS.slice();
         return{member:mh,huddle:hh};
@@ -1868,7 +1921,7 @@ var App={
         this.memberHeaders=[];this.huddleHeaders=[];
         var gapStart=-1,blankRun=0;
         headers.forEach(function(h,i){if(h){blankRun=0}else{blankRun++;if(blankRun>=5&&gapStart<0)gapStart=i-4}});
-        headers.forEach(function(h,i){if(!h)return;if(isHuddleCol(h)||(gapStart>=0&&i>gapStart+4))uniqPush(App.huddleHeaders,h);else uniqPush(App.memberHeaders,h)});
+        headers.forEach(function(h,i){if(!h)return;if(h.charAt(0)!=='['&&(isHuddleCol(h)||(gapStart>=0&&i>gapStart+4)))uniqPush(App.huddleHeaders,h);else uniqPush(App.memberHeaders,h)});
         HUDDLE_ID_COLS.concat(HUDDLE_COLS).concat(HUDDLE_PREP_COLS).forEach(function(h){uniqPush(App.huddleHeaders,h)});
         // Detect extra columns by header name
         this.extraCols=[];
@@ -2230,7 +2283,9 @@ var App={
        Stored in the same CSV as namespaced columns "[Team X] <field>". ===== */
     activeTeam:'Team 1',
     teamFields:function(){var base=['Next Call','Call Type','Reminder At','Reminder Note','Review During Daily','Daily Review Until'];
-        return base.concat(this.huddleHeaders||[]).filter(function(v,i,a){return v&&a.indexOf(v)===i})},
+        // never treat an already-namespaced "[Team X] ..." column (or bookkeeping columns) as a team field —
+        // that is what produced "[Team 2] [Team 1] ..." columns doubling on every switch
+        return base.concat(this.huddleHeaders||[]).filter(function(v,i,a){return v&&a.indexOf(v)===i&&v.charAt(0)!=='['&&v!=='Active Team'&&v!=='App Settings'})},
     getLiveField:function(m,f){if(f==='Next Call')return m.nextCall||'';if(f==='Call Type')return m.callType||'';return (m.extra&&m.extra[f])||''},
     setLiveField:function(m,f,v){if(f==='Next Call'){m.nextCall=v||''}else if(f==='Call Type'){m.callType=v||''}else{m.extra=m.extra||{};m.extra[f]=v||''}},
     getTeams:function(){var names={'Team 1':1};names[this.activeTeam]=1;var re=/^\[(.+?)\] /;
@@ -2574,6 +2629,115 @@ var App={
         });
     },
     hideFileInfo:function(){document.getElementById('fileInfoModal').classList.remove('open');this.unlockScroll()},
+    /* ===== CHECK & REPAIR (start screen) — streams the raw file, never builds the patient model ===== */
+    repairClassify:function(A,r){
+        var mid=A.idIdx>=0?(r[A.idIdx]||'').trim():'',note=A.noteIdx>=0?(r[A.noteIdx]||'').trim():'',nmid=A.noteMidIdx>=0?(r[A.noteMidIdx]||'').trim():'',sv=A.settingsIdx>=0?(r[A.settingsIdx]||'').trim():'';
+        if(sv&&!mid&&!note)return {kind:'settings'};
+        if(nmid&&note&&!mid)return {kind:'note',key:nmid+'\u0001'+note};
+        if(mid)return {kind:'member',key:mid};
+        return {kind:'other'};
+    },
+    repairAnalyze:function(text){
+        var A={header:[],cols:0,rows:0,memberRows:0,noteRows:0,settingsRows:0,otherRows:0,nested:[],teamCols:0,teams:{},dupNotes:0,dupMembers:0,fill:[],bytes:[],idIdx:-1,noteIdx:-1,noteMidIdx:-1,settingsIdx:-1,blankHeaders:0};
+        var ids={},nk={},self=this;
+        csvScan(text,function(r,idx){
+            if(idx===0){A.header=r.map(function(x){return x.trim()});A.cols=r.length;A.fill=new Array(r.length).fill(0);A.bytes=new Array(r.length).fill(0);
+                A.header.forEach(function(h,i){var lc=h.toLowerCase();
+                    if(lc==='member id')A.idIdx=i;else if(lc==='note')A.noteIdx=i;else if(lc==='notememberid')A.noteMidIdx=i;else if(lc==='app settings')A.settingsIdx=i;
+                    if(!h){A.blankHeaders++;return}
+                    if(isRunawayCol(h))A.nested.push(i);else if(h.charAt(0)==='['){A.teamCols++;var m=/^\[(.+?)\]/.exec(h);if(m)A.teams[m[1]]=1}});
+                return}
+            A.rows++;
+            for(var i=0,L=Math.min(r.length,A.cols);i<L;i++){var v=r[i];if(v){A.bytes[i]+=v.length;if(v.trim())A.fill[i]++}}
+            var k=self.repairClassify(A,r);
+            if(k.kind==='settings')A.settingsRows++;
+            else if(k.kind==='note'){A.noteRows++;if(nk[k.key])A.dupNotes++;else nk[k.key]=1}
+            else if(k.kind==='member'){A.memberRows++;if(ids[k.key])A.dupMembers++;else ids[k.key]=1}
+            else A.otherRows++;
+        });
+        var nestedSet={};A.nested.forEach(function(i){nestedSet[i]=1});
+        var colList=A.header.map(function(h,i){return {name:h,idx:i,bytes:A.bytes[i]||0,filled:A.fill[i]||0}}).filter(function(c){return c.name&&!nestedSet[c.idx]});
+        A.emptyDroppable=this.droppableEmptyCols(colList).map(function(name){return colList.filter(function(c){return c.name===name})[0].idx});
+        A.biggest=colList.slice().sort(function(a,b){return b.bytes-a.bytes}).slice(0,8);
+        A.totalBytes=colList.reduce(function(a,c){return a+c.bytes},0);
+        return A;
+    },
+    repairBuild:function(text,A,opt){
+        var keep=new Array(A.cols).fill(true),self=this;
+        if(opt.dropNested)A.nested.forEach(function(i){keep[i]=false});
+        if(opt.dropEmpty)(A.emptyDroppable||[]).forEach(function(i){keep[i]=false});
+        var out=[],ids={},nk={},removedNotes=0,removedMembers=0;
+        csvScan(text,function(r,idx){
+            if(idx>0){var k=self.repairClassify(A,r);
+                if(k.kind==='note'){if(opt.dedupeNotes&&nk[k.key]){removedNotes++;return}nk[k.key]=1}
+                else if(k.kind==='member'){if(opt.dedupeMembers&&ids[k.key]){removedMembers++;return}ids[k.key]=1}}
+            var o=[];for(var i=0;i<A.cols;i++){if(keep[i])o.push(csvF(i<r.length?r[i]:''))}
+            out.push(o.join(','));
+        });
+        return {text:out.join('\n')+'\n',removedNotes:removedNotes,removedMembers:removedMembers,cols:keep.filter(Boolean).length};
+    },
+    repairPickFile:function(){
+        var self=this;if(!window.showOpenFilePicker){this.toast('This browser cannot open files directly — use Chrome or Edge','danger');return}
+        window.showOpenFilePicker({types:[{description:'CSV',accept:{'text/csv':['.csv']}}]}).then(function(hs){return self.repairFromHandle(hs[0])}).catch(function(e){if(e&&e.name!=='AbortError')self.toast('Could not open file: '+(e.message||e),'danger')});
+    },
+    repairFromHandle:function(handle){
+        var self=this;this._rp={handle:handle};
+        document.getElementById('repairModal').classList.add('open');this.lockScroll();
+        var body=document.getElementById('repairBody');body.innerHTML='<p style="color:var(--t3)">Reading file\u2026</p>';
+        return handle.getFile().then(function(file){self._rp.name=file.name;self._rp.size=file.size;body.innerHTML='<p style="color:var(--t3)">Scanning <b>'+self.esc(file.name)+'</b> ('+self.fmtBytes(file.size)+')\u2026 this does not load the patients, so it will not freeze.</p>';return file.text()})
+        .then(function(text){self._rp.text=text;return new Promise(function(res){setTimeout(res,30)})})
+        .then(function(){self._rp.A=self.repairAnalyze(self._rp.text);self.renderRepairReport()})
+        .catch(function(e){body.innerHTML='<div class="fh-warn">Could not read the file: '+self.esc(e.message||e)+'</div>'});
+    },
+    renderRepairReport:function(){
+        var self=this,A=this._rp.A,h='';
+        h+='<div class="fh-grid"><div class="fh-stat"><b>'+this.fmtBytes(this._rp.size)+'</b><span>File on disk</span></div>'
+          +'<div class="fh-stat"><b>'+A.cols.toLocaleString()+'</b><span>Columns</span></div>'
+          +'<div class="fh-stat"><b>'+A.memberRows.toLocaleString()+'</b><span>Patient rows</span></div>'
+          +'<div class="fh-stat"><b>'+A.noteRows.toLocaleString()+'</b><span>Note rows</span></div>'
+          +(A.otherRows?'<div class="fh-stat"><b>'+A.otherRows.toLocaleString()+'</b><span>Huddle-only rows</span></div>':'')+'</div>';
+        var teams=Object.keys(A.teams);
+        var any=A.nested.length||A.dupNotes||A.dupMembers||A.emptyDroppable.length;
+        h+='<div class="fh-h">'+(any?'What will be fixed':'Nothing to fix')+'</div>';
+        if(A.nested.length)h+='<label class="rp-issue bad"><input type="checkbox" id="rpNested" checked><div><b>Remove '+A.nested.length.toLocaleString()+' runaway team columns</b><small>Columns like "[Team 2] [Team 1] \u2026" \u2014 garbage created by a bug when switching teams (now fixed in the app). Each team\u2019s real data ('+A.teamCols+' columns'+(teams.length?': '+this.esc(teams.join(', ')):'')+') is kept.</small></div></label>';
+        if(A.dupNotes)h+='<label class="rp-issue bad"><input type="checkbox" id="rpNotes" checked><div><b>Remove '+A.dupNotes.toLocaleString()+' duplicate notes</b><small>Same patient, identical text. The first copy of each is kept.</small></div></label>';
+        if(A.dupMembers)h+='<label class="rp-issue bad"><input type="checkbox" id="rpMembers" checked><div><b>Remove '+A.dupMembers.toLocaleString()+' duplicate patient rows</b><small>Same Member ID more than once. The first row is kept; notes are unaffected.</small></div></label>';
+        if(A.emptyDroppable.length)h+='<label class="rp-issue"><input type="checkbox" id="rpEmpty"><div><b>Drop '+A.emptyDroppable.length+' empty columns</b><small>Columns with no data in any row (built-in columns are never dropped). Optional.</small></div></label>';
+        if(!any)h+='<div class="fh-ok">No runaway columns, duplicates, or empty columns found. '+(A.cols>300?'The file has a lot of columns ('+A.cols+') \u2014 see the biggest ones below.':'')+'</div>';
+        h+='<div class="fh-h">Biggest columns</div><table class="fh-table"><tr><th>Column</th><th></th><th class="num">Size</th><th class="num">Filled</th></tr>';
+        var max=A.biggest[0]?A.biggest[0].bytes||1:1;
+        A.biggest.forEach(function(c){h+='<tr><td>'+self.esc(c.name)+'</td><td style="width:30%"><div class="fh-bar" style="width:'+Math.max(1,Math.round(100*c.bytes/max))+'%"></div></td><td class="num">'+self.fmtBytes(c.bytes)+' <span style="color:var(--t3)">('+(A.totalBytes?Math.round(100*c.bytes/A.totalBytes):0)+'%)</span></td><td class="num">'+c.filled.toLocaleString()+'</td></tr>'});
+        h+='</table><div id="rpResult"></div>';
+        document.getElementById('repairBody').innerHTML=h;
+        document.getElementById('repairFoot').innerHTML='<span style="font-size:12px;color:var(--t3);flex:1">Repaired copy = a new file next to the original; the original is untouched.</span>'
+            +'<button class="btn" onclick="App.hideRepair()">Close</button>'
+            +(any?'<button class="btn" onclick="App.repairSave(true)">Overwrite original</button><button class="btn btn-p" onclick="App.repairSave(false)">Save repaired copy\u2026</button>':'');
+    },
+    repairSave:function(overwrite){
+        var self=this,A=this._rp.A,text=this._rp.text;
+        var opt={dropNested:!!(document.getElementById('rpNested')||{}).checked,dedupeNotes:!!(document.getElementById('rpNotes')||{}).checked,dedupeMembers:!!(document.getElementById('rpMembers')||{}).checked,dropEmpty:!!(document.getElementById('rpEmpty')||{}).checked};
+        if(overwrite&&!confirm('Overwrite '+this._rp.name+' with the repaired version?\n\nThere is no undo \u2014 "Save repaired copy" is the safer choice.'))return;
+        var res=document.getElementById('rpResult');res.innerHTML='<p style="color:var(--t3)">Building repaired file\u2026</p>';
+        setTimeout(function(){
+            var R=self.repairBuild(text,A,opt);
+            var target=overwrite?Promise.resolve(self._rp.handle):window.showSaveFilePicker({suggestedName:self._rp.name.replace(/\.csv$/i,'')+'-repaired.csv',types:[{description:'CSV',accept:{'text/csv':['.csv']}}]});
+            target.then(function(h){return h.createWritable().then(function(w){return w.write(R.text).then(function(){return w.close()})}).then(function(){return h})})
+            .then(function(h){
+                self._rp.repairedHandle=h;
+                res.innerHTML='<div class="rp-result"><b>Repaired.</b> '+A.cols.toLocaleString()+' \u2192 '+R.cols.toLocaleString()+' columns'
+                    +(R.removedNotes?', removed '+R.removedNotes.toLocaleString()+' duplicate notes':'')+(R.removedMembers?', removed '+R.removedMembers.toLocaleString()+' duplicate patient rows':'')
+                    +'. New size: <b>'+self.fmtBytes(R.text.length)+'</b> (was '+self.fmtBytes(self._rp.size)+').'
+                    +'<div class="fh-actions"><button class="btn btn-p" onclick="App.repairOpen()">Open the repaired file</button></div></div>';
+            }).catch(function(e){if(e&&e.name==='AbortError'){res.innerHTML='';return}res.innerHTML='<div class="fh-warn">Save failed: '+self.esc(e.message||e)+'</div>'});
+        },30);
+    },
+    repairOpen:function(){
+        var h=this._rp&&this._rp.repairedHandle;if(!h)return;var self=this;
+        this.hideRepair();
+        try{var pm=window.FileMem&&FileMem.save?FileMem.save(h):null;if(pm&&pm.catch)pm.catch(function(){})}catch(e){}
+        this.loadFromHandle(h).catch(function(e){self.toast('Could not open: '+(e.message||e),'danger')});
+    },
+    hideRepair:function(){document.getElementById('repairModal').classList.remove('open');this.unlockScroll()},
     fixDupNotes:function(){
         var seen={},keep=[],removed=0;
         (this.notes||[]).forEach(function(n){var k=n.memberId+'\u0001'+(n.note||'').trim();if(seen[k]){removed++;return}seen[k]=1;keep.push(n)});
