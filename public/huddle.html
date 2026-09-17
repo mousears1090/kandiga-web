@@ -521,6 +521,20 @@
         .pager b{color:var(--t1)}
         .pager select{padding:5px 8px;font-family:var(--font);font-size:12.5px;border:1px solid var(--bd);border-radius:7px;background:var(--bg-1);color:var(--t1)}
         .pager .btn{padding:5px 10px}
+        /* file health */
+        .fh-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+        .fh-stat{background:var(--bg-2);border:1px solid var(--bd);border-radius:var(--r);padding:10px 12px}
+        .fh-stat b{display:block;font-size:20px;color:var(--t1)}
+        .fh-stat span{font-size:11.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em}
+        .fh-h{font-size:12px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.04em;margin:14px 0 6px}
+        .fh-table{width:100%;border-collapse:collapse;font-size:13px}
+        .fh-table td,.fh-table th{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:left}
+        .fh-table th{font-size:11px;color:var(--t3);text-transform:uppercase}
+        .fh-table td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+        .fh-bar{height:6px;background:var(--acc);border-radius:3px;min-width:2px}
+        .fh-warn{background:#fef3c7;border:1px solid #f59e0b;color:#92400e;border-radius:var(--r);padding:10px 12px;font-size:13px;margin-bottom:12px}
+        .fh-ok{background:#ecfdf5;border:1px solid #10b981;color:#065f46;border-radius:var(--r);padding:10px 12px;font-size:13px;margin-bottom:12px}
+        .fh-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
         .resume-btn{margin-top:10px;width:100%;border-color:var(--acc)!important;color:var(--acc)!important;font-weight:700;
             white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .resume-btn:hover{background:var(--acc-bg)!important}
@@ -637,7 +651,7 @@
     <header class="header">
         <div class="header-left">
             <h1>Member<span class="ac">Manager</span></h1>
-            <div class="file-badges"><span class="fb" id="badgeM"></span></div>
+            <div class="file-badges"><span class="fb" id="badgeM"></span><button class="mh-icobtn" title="File health — where the file size goes" onclick="App.showFileInfo()"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></button></div>
             <select id="teamSel" class="team-sel" onchange="App.onTeamSelect(this.value)" title="Switch team — same patients and notes, separate call/reminder/huddle work"></select>
             <button id="teamDelBtn" class="team-del" style="display:none" onclick="App.deleteTeamPrompt()" title="Delete this team (patients and notes are kept)"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
         </div>
@@ -1089,6 +1103,15 @@
             <button class="btn btn-sm" onclick="App.addSortRule()" style="margin-top:10px">+ Add Rule</button>
         </div>
         <div class="mf"><button class="btn" onclick="App.resetSort()">Default</button><button class="btn" onclick="App.hideSortModal()">Cancel</button><button class="btn btn-p" onclick="App.applyCustomSort()">Apply</button></div>
+    </div>
+</div>
+
+<!-- FILE HEALTH MODAL -->
+<div class="mo" id="fileInfoModal" onclick="if(event.target===this)App.hideFileInfo()">
+    <div class="modal" style="max-width:720px">
+        <div class="mh"><h2>File Health</h2><button class="mx" onclick="App.hideFileInfo()">&times;</button></div>
+        <div class="mb" id="fileInfoBody"></div>
+        <div class="mf"><span style="flex:1"></span><button class="btn" onclick="App.hideFileInfo()">Close</button></div>
     </div>
 </div>
 
@@ -2495,6 +2518,92 @@ var App={
             +(pages>1?'<button class="btn btn-sm" '+(cur<=0?'disabled':'')+' onclick="App.setPage('+(cur-1)+')">\u2039 Prev</button>'
                 +'<span>Page <b>'+(cur+1)+'</b> / '+pages+'</span>'
                 +'<button class="btn btn-sm" '+(cur>=pages-1?'disabled':'')+' onclick="App.setPage('+(cur+1)+')">Next \u203A</button>':'');
+    },
+    /* ===== FILE HEALTH — where do the bytes go? (nothing leaves the machine) ===== */
+    fmtBytes:function(b){return b>=1048576?(b/1048576).toFixed(1)+' MB':b>=1024?Math.round(b/1024)+' KB':b+' B'},
+    fileStats:function(){
+        var self=this,layout=this.buildCSVLayout(),members=this.members||[],notes=this.notes||[];
+        var cols={};var add=function(h,v){v=v==null?'':String(v);if(!cols[h])cols[h]={name:h,bytes:0,filled:0};cols[h].bytes+=v.length;if(v.trim())cols[h].filled++};
+        members.forEach(function(m){layout.member.forEach(function(h){add(h,self.getMemberVal(m,h))});layout.huddle.forEach(function(h){add(h,(m.extra&&m.extra[h])||'')})});
+        var noteBytes=0;notes.forEach(function(n){noteBytes+=(n.note||'').length;add('Note (rows)',n.note||'')});
+        var colList=Object.keys(cols).map(function(k){return cols[k]}).sort(function(a,b){return b.bytes-a.bytes});
+        var totalBytes=colList.reduce(function(a,c){return a+c.bytes},0);
+        // duplicate notes: same patient + same text
+        var seen={},dupNotes=0;notes.forEach(function(n){var k=n.memberId+'\u0001'+(n.note||'').trim();if(seen[k])dupNotes++;else seen[k]=1});
+        // duplicate member rows: same Member ID more than once
+        var idc={},dupMembers=0;members.forEach(function(m){var id=(m.memberId||'').trim();if(!id)return;idc[id]=(idc[id]||0)+1});Object.keys(idc).forEach(function(k){if(idc[k]>1)dupMembers+=idc[k]-1});
+        var emptyCols=this.droppableEmptyCols(colList).length;
+        var perPatient={};notes.forEach(function(n){perPatient[n.memberId]=(perPatient[n.memberId]||0)+1});
+        var top=Object.keys(perPatient).map(function(k){return {id:k,n:perPatient[k]}}).sort(function(a,b){return b.n-a.n}).slice(0,5);
+        var regular=members.filter(function(m){return self.isRegularMember(m)}).length;
+        return {cols:colList,totalBytes:totalBytes,noteBytes:noteBytes,notes:notes.length,members:members.length,regular:regular,
+            huddleOnly:members.length-regular,columns:layout.member.length+layout.huddle.length,dupNotes:dupNotes,dupMembers:dupMembers,emptyCols:emptyCols,topNotes:top,
+            avgNote:notes.length?Math.round(noteBytes/notes.length):0};
+    },
+    showFileInfo:function(){
+        var self=this;document.getElementById('fileInfoModal').classList.add('open');this.lockScroll();
+        var body=document.getElementById('fileInfoBody');body.innerHTML='<p style="color:var(--t3)">Analyzing\u2026</p>';
+        var sizeP=this.mHandle&&this.mHandle.getFile?this.mHandle.getFile().then(function(f){return f.size}).catch(function(){return 0}):Promise.resolve(0);
+        sizeP.then(function(fileSize){
+            var st=self.fileStats();
+            var h='';
+            if(fileSize)h+='<div class="fh-grid"><div class="fh-stat"><b>'+self.fmtBytes(fileSize)+'</b><span>File on disk</span></div>';else h+='<div class="fh-grid">';
+            h+='<div class="fh-stat"><b>'+st.regular.toLocaleString()+'</b><span>Patients</span></div>'
+              +'<div class="fh-stat"><b>'+st.notes.toLocaleString()+'</b><span>Notes ('+self.fmtBytes(st.noteBytes)+')</span></div>'
+              +'<div class="fh-stat"><b>'+st.columns+'</b><span>Columns</span></div>'
+              +(st.huddleOnly?'<div class="fh-stat"><b>'+st.huddleOnly+'</b><span>Huddle-only rows</span></div>':'')+'</div>';
+            var issues=[];
+            if(st.dupNotes)issues.push('<b>'+st.dupNotes.toLocaleString()+'</b> duplicate notes (same patient, identical text)');
+            if(st.dupMembers)issues.push('<b>'+st.dupMembers.toLocaleString()+'</b> duplicate patient rows (same Member ID)');
+            if(st.emptyCols)issues.push('<b>'+st.emptyCols+'</b> completely empty columns');
+            if(st.cols[0]&&st.cols[0].name!=='Note (rows)'&&st.totalBytes&&st.cols[0].bytes/st.totalBytes>0.5)issues.push('One column, <b>'+self.esc(st.cols[0].name)+'</b>, is '+Math.round(100*st.cols[0].bytes/st.totalBytes)+'% of the data');
+            h+=issues.length?'<div class="fh-warn">Found: '+issues.join(' \u00B7 ')+'</div>':'<div class="fh-ok">No duplicates or empty columns found.</div>';
+            if(st.dupNotes||st.dupMembers||st.emptyCols){
+                h+='<div class="fh-actions">'
+                  +(st.dupNotes?'<button class="btn btn-sm btn-p" onclick="App.fixDupNotes()">Remove '+st.dupNotes.toLocaleString()+' duplicate notes</button>':'')
+                  +(st.dupMembers?'<button class="btn btn-sm btn-p" onclick="App.fixDupMembers()">Merge '+st.dupMembers.toLocaleString()+' duplicate patients</button>':'')
+                  +(st.emptyCols?'<button class="btn btn-sm" onclick="App.fixEmptyCols()">Drop '+st.emptyCols+' empty columns</button>':'')
+                  +'</div><p style="font-size:12px;color:var(--t3);margin-top:8px">Cleanups rewrite the CSV in place \u2014 make a copy of the file first if you want a fallback.</p>';
+            }
+            h+='<div class="fh-h">Biggest columns (share of all text in the file)</div><table class="fh-table"><tr><th>Column</th><th></th><th class="num">Size</th><th class="num">Filled cells</th></tr>';
+            var max=st.cols[0]?st.cols[0].bytes:1;
+            st.cols.slice(0,12).forEach(function(c){h+='<tr><td>'+self.esc(c.name)+'</td><td style="width:32%"><div class="fh-bar" style="width:'+Math.max(1,Math.round(100*c.bytes/max))+'%"></div></td><td class="num">'+self.fmtBytes(c.bytes)+' <span style="color:var(--t3)">('+(st.totalBytes?Math.round(100*c.bytes/st.totalBytes):0)+'%)</span></td><td class="num">'+c.filled.toLocaleString()+'</td></tr>'});
+            h+='</table>';
+            if(st.topNotes.length)h+='<div class="fh-h">Most notes per patient (avg note '+st.avgNote+' chars)</div><table class="fh-table">'+st.topNotes.map(function(t){var m=self.findMemberByAnyId(t.id);return '<tr><td>'+self.esc(m?(m.name||self.hName(m)||t.id):t.id)+' <span style="color:var(--t3)">'+self.esc(t.id)+'</span></td><td class="num">'+t.n.toLocaleString()+' notes</td></tr>'}).join('')+'</table>';
+            body.innerHTML=h;
+        });
+    },
+    hideFileInfo:function(){document.getElementById('fileInfoModal').classList.remove('open');this.unlockScroll()},
+    fixDupNotes:function(){
+        var seen={},keep=[],removed=0;
+        (this.notes||[]).forEach(function(n){var k=n.memberId+'\u0001'+(n.note||'').trim();if(seen[k]){removed++;return}seen[k]=1;keep.push(n)});
+        if(!removed)return;if(!confirm('Remove '+removed+' duplicate notes? The first copy of each is kept.'))return;
+        this.notes=keep;this.writeMemberCSV();this.render();this.toast('Removed '+removed+' duplicate notes','success');this.showFileInfo();
+    },
+    fixDupMembers:function(){
+        var byId={},keep=[],removed=0;
+        (this.members||[]).forEach(function(m){var id=(m.memberId||'').trim();if(!id){keep.push(m);return}
+            if(byId[id]){var k=byId[id];Object.keys(m.extra||{}).forEach(function(h){if(!(k.extra[h]&&String(k.extra[h]).trim())&&m.extra[h])k.extra[h]=m.extra[h]});['name','tier','nextCall','callType','cm'].forEach(function(f){if(!k[f]&&m[f])k[f]=m[f]});removed++;return}
+            byId[id]=m;keep.push(m)});
+        if(!removed)return;if(!confirm('Merge '+removed+' duplicate patient rows into one per Member ID? Blank fields are filled from the duplicates; notes are unaffected.'))return;
+        this.members=keep;this.writeMemberCSV();this.render();this.toast('Merged '+removed+' duplicate patients','success');this.showFileInfo();
+    },
+    // empty columns that are safe to drop: not built-in member/note/huddle/team columns
+    droppableEmptyCols:function(colList){
+        var core=['id','member id','name','tier','next call','call type','case manager','cm','active','notememberid','notetimestamp','note','app settings','active team',
+            'hinttitle','hintlabel','hint','review during daily','daily review until','reminder at','reminder note'];
+        return colList.filter(function(c){return !c.filled&&c.name!=='Note (rows)'}).map(function(c){return c.name})
+            .filter(function(h){var lc=h.toLowerCase();return core.indexOf(lc)===-1&&!isHuddleCol(h)&&HUDDLE_PREP_COLS.indexOf(h)===-1&&HUDDLE_COLS.indexOf(h)===-1&&HUDDLE_ID_COLS.indexOf(h)===-1&&lc.indexOf('[team ')!==0});
+    },
+    fixEmptyCols:function(){
+        var self=this,st=this.fileStats(),empty=this.droppableEmptyCols(st.cols);
+        if(!empty.length){this.toast('Nothing safe to drop','success');return}
+        if(!confirm('Drop '+empty.length+' empty columns?\n\n'+empty.slice(0,15).join(', ')+(empty.length>15?', \u2026':'')))return;
+        this.members.forEach(function(m){empty.forEach(function(h){if(m.extra)delete m.extra[h]})});
+        this.csvHeaders=(this.csvHeaders||[]).filter(function(h){return empty.indexOf(h)===-1});
+        this.memberHeaders=(this.memberHeaders||[]).filter(function(h){return empty.indexOf(h)===-1});
+        this.extraCols=(this.extraCols||[]).filter(function(c){return empty.indexOf(c.name)===-1});
+        this.writeMemberCSV();this.render();this.toast('Dropped '+empty.length+' empty columns','success');this.showFileInfo();
     },
     clearSearch:function(){document.getElementById('searchInput').value='';this.onSearch('')},
 
