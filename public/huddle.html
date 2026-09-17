@@ -516,6 +516,11 @@
         .sort-preset-save{display:flex;gap:8px}
         .sort-preset-save input{flex:1;min-width:0;padding:7px 10px;font-family:var(--font);font-size:12.5px;border:1px solid var(--bd);border-radius:7px;background:var(--bg-1);color:var(--t1);outline:none}
         .sort-preset-save input:focus{border-color:var(--acc)}
+        /* table pagination — big lists render one page at a time */
+        .pager{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:10px 6px;font-size:12.5px;color:var(--t3);flex-wrap:wrap}
+        .pager b{color:var(--t1)}
+        .pager select{padding:5px 8px;font-family:var(--font);font-size:12.5px;border:1px solid var(--bd);border-radius:7px;background:var(--bg-1);color:var(--t1)}
+        .pager .btn{padding:5px 10px}
         .resume-btn{margin-top:10px;width:100%;border-color:var(--acc)!important;color:var(--acc)!important;font-weight:700;
             white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .resume-btn:hover{background:var(--acc-bg)!important}
@@ -709,6 +714,7 @@
             <th data-col="cm" onclick="App.sort('cm')">CM <span class="si"></span></th>
             <th>Notes</th><th></th>
         </tr></thead><tbody id="tbody"></tbody></table>
+    <div class="pager" id="pager" style="display:none"></div>
     </div>
     <div class="empty-state" id="emptyState"><div class="empty-icon">+</div><h3>No members yet</h3><p>Click "+ Add Member" to get started.</p></div>
     </div>
@@ -2471,7 +2477,25 @@ var App={
             return self.compareSortVal(a,b,'name','asc',null)||self.compareSortVal(a,b,'memberId','asc',null);
         });
     },
-    onSearch:function(v){this.query=v;document.querySelector('.search-wrap').classList.toggle('has-query',!!v);this.render()},
+    onSearch:function(v){this.query=v;document.querySelector('.search-wrap').classList.toggle('has-query',!!v);
+        // debounced: with 1500+ rows a full render per keystroke lags — wait for typing to pause
+        var self=this;clearTimeout(this._searchTimer);this._searchTimer=setTimeout(function(){self.page=0;self.render()},120)},
+    /* ===== pagination ===== */
+    page:0,pageSize:100,
+    setPage:function(n){this.page=Math.max(0,n|0);this.render();var w=document.querySelector('.table-wrap');if(w)w.scrollTop=0},
+    setPageSize:function(v){this.pageSize=v==='all'?0:(parseInt(v,10)||100);this.page=0;this.render()},
+    renderPager:function(total,start,end){
+        var el=document.getElementById('pager');if(!el)return;
+        if(!total||this.currentView!=='table'||this.xlMode){el.style.display='none';return}
+        var ps=this.pageSize,pages=ps?Math.max(1,Math.ceil(total/ps)):1,cur=this.page;
+        var opts=[100,250,500].map(function(n){return '<option value="'+n+'"'+(ps===n?' selected':'')+'>'+n+' per page</option>'}).join('')+'<option value="all"'+(!ps?' selected':'')+'>Show all</option>';
+        el.style.display='';
+        el.innerHTML='Showing <b>'+(start+1).toLocaleString()+'\u2013'+end.toLocaleString()+'</b> of <b>'+total.toLocaleString()+'</b>'
+            +'<select onchange="App.setPageSize(this.value)">'+opts+'</select>'
+            +(pages>1?'<button class="btn btn-sm" '+(cur<=0?'disabled':'')+' onclick="App.setPage('+(cur-1)+')">\u2039 Prev</button>'
+                +'<span>Page <b>'+(cur+1)+'</b> / '+pages+'</span>'
+                +'<button class="btn btn-sm" '+(cur>=pages-1?'disabled':'')+' onclick="App.setPage('+(cur+1)+')">Next \u203A</button>':'');
+    },
     clearSearch:function(){document.getElementById('searchInput').value='';this.onSearch('')},
 
     /* ===== BULK SELECT ===== */
@@ -2684,6 +2708,9 @@ var App={
             list=remPin.concat(list.filter(function(m){return remPin.indexOf(m)===-1}));
         }
         var tbody=document.getElementById('tbody'),empty=document.getElementById('emptyState'),table=document.getElementById('dataTable'),stats=document.getElementById('stats');
+        // note counts once per render (was a full scan + date sort of ALL notes for EVERY row)
+        var ncMap={};this.notes.forEach(function(n){ncMap[n.memberId]=(ncMap[n.memberId]||0)+1});
+        var noteCount=function(m){return ncMap[m.memberId]||0};
         var filtered=list.length;var total=this.members.filter(function(m){return App.isRegularMember(m)}).length;
         var reviewTotal=this.members.filter(function(m){return App.isRegularMember(m)&&App.isDailyReviewActive(m)}).length;
         var rb=document.getElementById('reviewFilterBtn');if(rb){rb.textContent='Review'+(reviewTotal?' ('+reviewTotal+')':'');rb.classList.toggle('btn-p',this.reviewOnly)}
@@ -2702,7 +2729,7 @@ var App={
             var activeCount=list.filter(function(m){return m.active!==false}).length;
             document.getElementById('emrStats').innerHTML='<div class="emr-stat"><span>'+filtered+'</span> members</div><div class="emr-stat"><span>'+activeCount+'</span> active</div>';
             document.getElementById('emrGrid').innerHTML=list.map(function(m){
-                var nc=self.getNotesFor(m.memberId).length;
+                var nc=noteCount(m);
                 var isUrg=m.callType==='Urgent';
                 var isActive=m.active!==false;
                 var tc='tier-'+(m.tier||'').toLowerCase();
@@ -2729,14 +2756,22 @@ var App={
         }else{
             emrView.style.display='none';
             if(this.currentView==='table'&&tableWrap)tableWrap.style.display='';
-            if(!list.length){table.style.display='none';empty.style.display='block';
+            if(!list.length){table.style.display='none';empty.style.display='block';this.renderPager(0,0,0);
                 empty.querySelector('h3').textContent=this.query?'No matches':'No members yet';
                 empty.querySelector('p').textContent=this.query?'Try a different search.':'Click "+ Add Member" to get started.';
             }else{
                 table.style.display='';empty.style.display='none';
-                tbody.innerHTML=list.map(function(m){
+                // reset to page 1 whenever the underlying list changes (search / filter / sort)
+                var sig=[this.query,this.reviewOnly,this.sortCol,this.sortDir,this.sortMode,JSON.stringify(this.sortRules||[]),list.length].join('|');
+                if(sig!==this._listSig){this._listSig=sig;this.page=0}
+                var ps=this.pageSize,pages=ps?Math.max(1,Math.ceil(list.length/ps)):1;
+                if(this.page>pages-1)this.page=pages-1;
+                var start=ps?this.page*ps:0,end=ps?Math.min(list.length,start+ps):list.length;
+                var pageList=list.slice(start,end);
+                this.renderPager(list.length,start,end);
+                tbody.innerHTML=pageList.map(function(m){
                     var tc='tier-'+(m.tier||'').toLowerCase();
-                    var nc=self.getNotesFor(m.memberId).length;
+                    var nc=noteCount(m);
                     var isUrg=m.callType==='Urgent';
                     var isSel=self.selectedIds&&self.selectedIds[m.id];
                     return '<tr class="'+(m.active===false?'inactive':'')+(isSel?' selected':'')+'" onclick="App.rowClick(event,\''+m.id+'\')">'
