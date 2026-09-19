@@ -536,6 +536,22 @@
         .fh-ok{background:#ecfdf5;border:1px solid #10b981;color:#065f46;border-radius:var(--r);padding:10px 12px;font-size:13px;margin-bottom:12px}
         .fh-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
         .setup-repair{margin-top:26px;text-align:center}
+        /* calls */
+        .mo.mo-top{z-index:1100}
+        .call-btn{display:inline-flex;align-items:center;gap:5px;border-color:var(--acc)!important;color:var(--acc)!important;font-weight:700}
+        .call-btn .ic,.mh h2 .ic,.btn-sm .ic{width:14px;height:14px}
+        .mh h2 .ic{vertical-align:-1px;margin-right:4px}
+        .call-hint{font-size:12px;color:var(--t3);margin-top:5px;min-height:16px}
+        .call-hint.bad{color:#dc2626}
+        .note-card.note-call{border-left:3px solid var(--acc)}
+        .note-call-badge{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;color:var(--acc);background:var(--acc-bg);border-radius:999px;padding:2px 8px;margin-left:6px}
+        .note-call-badge .ic{width:12px;height:12px}
+        .cl-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+        .cl-bar input{padding:6px 10px;font-family:var(--font);font-size:13px;border:1px solid var(--bd);border-radius:7px;background:var(--bg-1);color:var(--t1)}
+        .cl-table tr.cl-row{cursor:pointer}
+        .cl-table tr.cl-row:hover td{background:var(--bg-2)}
+        .cl-times{color:var(--t3);font-size:12px}
+        .cl-total td{font-weight:800;border-top:2px solid var(--bd)}
         .setup-repair .btn .ic{width:14px;height:14px;vertical-align:-2px;margin-right:4px}
         .setup-repair p{font-size:12px;color:var(--t3);margin:8px auto 0;max-width:420px}
         .rp-issue{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--bd);border-radius:var(--r);margin-bottom:8px;background:var(--bg-2)}
@@ -715,6 +731,7 @@
         <div class="stats" id="stats"></div>
         <button class="btn btn-sm" onclick="App.showSortModal()">Sort</button>
         <button class="btn btn-sm" onclick="App.resetSort()" title="Reset sorting to default order"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg> Default</button>
+        <button class="btn btn-sm" onclick="App.openCallLog()" title="Who did I call on a given day?"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg> Call Log</button>
     </div>
     <div class="filter-bar" id="filterBar">
         <div class="filter-bar-row">
@@ -1073,7 +1090,7 @@
 <div class="mo" id="notesModal" onclick="if(event.target===this)App.hideNotesModal()">
     <div class="notes-modal-wrap">
         <div class="modal modal-notes">
-            <div class="mh"><h2>Notes<span class="sub" id="notesSub"></span></h2><div style="display:flex;align-items:center;gap:10px"><span class="modal-clock" id="notesClock"></span><button class="mh-icobtn" title="Reminder" onclick="App.openReminderFromChart()"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button><button class="btn btn-sm" onclick="App.openHuddlePrepFromNotes()">Huddle Prep</button><button class="mx" onclick="App.hideNotesModal()">&times;</button></div></div>
+            <div class="mh"><h2>Notes<span class="sub" id="notesSub"></span></h2><div style="display:flex;align-items:center;gap:10px"><span class="modal-clock" id="notesClock"></span><button class="btn btn-sm call-btn" onclick="App.openCallModal()"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg> Call</button><button class="mh-icobtn" title="Reminder" onclick="App.openReminderFromChart()"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button><button class="btn btn-sm" onclick="App.openHuddlePrepFromNotes()">Huddle Prep</button><button class="mx" onclick="App.hideNotesModal()">&times;</button></div></div>
             <div class="note-info" id="noteInfo"></div>
             <div class="note-fields" id="noteFields"></div>
             <div class="notes-body">
@@ -1125,6 +1142,37 @@
             <button class="btn btn-sm" onclick="App.addSortRule()" style="margin-top:10px">+ Add Rule</button>
         </div>
         <div class="mf"><button class="btn" onclick="App.resetSort()">Default</button><button class="btn" onclick="App.hideSortModal()">Cancel</button><button class="btn btn-p" onclick="App.applyCustomSort()">Apply</button></div>
+    </div>
+</div>
+
+<!-- LOG CALL (sub-modal over the chart) -->
+<div class="mo mo-top" id="callModal" onclick="if(event.target===this)App.hideCallModal()">
+    <div class="modal modal-sm">
+        <div class="mh"><h2><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg> Log Call<span class="sub" id="callSub" style="font-weight:400;color:var(--t3)"></span></h2><button class="mx" onclick="App.hideCallModal()">&times;</button></div>
+        <div class="mb">
+            <div class="fi"><label>Date &amp; time (PT)</label><input type="datetime-local" id="callAt"></div>
+            <div class="fi"><label>Talk time <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+                <input type="text" id="callTalk" placeholder="minutes, e.g. 12  or  12:30  (min:sec)" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();App.saveCall()}">
+                <div class="call-hint" id="callTalkHint"></div></div>
+        </div>
+        <div class="mf"><button class="btn btn-d" id="callDelBtn" style="display:none" onclick="App.deleteCallFromModal()">Delete</button><span style="flex:1"></span><button class="btn" onclick="App.hideCallModal()">Cancel</button><button class="btn btn-p" onclick="App.saveCall()">Save Call</button></div>
+    </div>
+</div>
+
+<!-- CALL LOG (lookup by date) -->
+<div class="mo" id="callLogModal" onclick="if(event.target===this)App.hideCallLog()">
+    <div class="modal" style="max-width:760px">
+        <div class="mh"><h2><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg> Call Log</h2><button class="mx" onclick="App.hideCallLog()">&times;</button></div>
+        <div class="mb">
+            <div class="cl-bar">
+                <button class="btn btn-sm" onclick="App.callLogShift(-1)" title="Previous day">&lsaquo;</button>
+                <input type="date" id="callLogDate" onchange="App.renderCallLog()">
+                <button class="btn btn-sm" onclick="App.callLogShift(1)" title="Next day">&rsaquo;</button>
+                <button class="btn btn-sm" onclick="App.callLogToday()">Today</button>
+            </div>
+            <div id="callLogBody"></div>
+        </div>
+        <div class="mf"><span style="flex:1"></span><button class="btn" onclick="App.hideCallLog()">Close</button></div>
     </div>
 </div>
 
@@ -1691,7 +1739,7 @@ var TIER_ORDER={Gold:0,Silver:1,Bronze:2,Copper:3,Steel:4};
 var HUDDLE_ID_COLS=['Huddle Member ID','Huddle Name','Huddle PCP','Huddle Case Manager','Huddle Tier'];
 var HUDDLE_COLS=['Huddle Status','Times Discussed','Last Discussed','Huddle Notes'];
 var HUDDLE_PREP_COLS=['Prep Age','Prep Sex','Prep Plan','Prep Last HRA Date','Prep HRA Due Date','Prep Primary Provider','Prep Attributed Provider','Prep History','Prep Care Plan','Prep Missed Appointments 12M','Prep Most Recent Appointment','Prep ER Visits 12M','Prep IP Admissions 12M','Prep Most Recent ER/IP','Prep Recent Authorizations','Prep Appointments','Prep Admissions','Prep Assigned Tasks','Prep Custom Rows','Prep Date','Prep Date History','Prep Last Readout','Prep Last Prepared Date','Prep Notes'];
-var MEMBER_COL_DEFAULTS=['ID','Member ID','Name','PCP','Case Manager','Tier','Call Type','Next Call','Review During Daily','Daily Review Until','active','hintTitle','hintLabel','hint','noteMemberID','noteTimestamp','note'];
+var MEMBER_COL_DEFAULTS=['ID','Member ID','Name','PCP','Case Manager','Tier','Call Type','Next Call','Review During Daily','Daily Review Until','active','hintTitle','hintLabel','hint','noteMemberID','noteTimestamp','note','noteKind','noteTalkSeconds'];
 function normHeader(h){return String(h||'').trim().toLowerCase().replace(/\s+/g,' ')}
 function isHuddleCol(h){var n=normHeader(h);return n.indexOf('prep ')===0||n==='huddle member id'||n==='huddle name'||n==='huddle pcp'||n==='huddle case manager'||n==='huddle tier'||n==='huddle status'||n==='times discussed'||n==='last discussed'||n==='huddle notes'}
 function uniqPush(arr,v){if(v!=null&&String(v).trim()&&arr.indexOf(v)===-1)arr.push(v)}
@@ -1833,6 +1881,8 @@ var App={
                 if(nh==='notememberid')vals[i]=n.memberId;
                 if(nh==='notetimestamp')vals[i]=n.ts;
                 if(nh==='note')vals[i]=n.note;
+                if(nh==='notekind')vals[i]=n.kind||'';
+                if(nh==='notetalkseconds')vals[i]=n.talk||'';
             });
             csv+=vals.map(csvF).join(',')+'\n';
         });
@@ -1929,11 +1979,13 @@ var App={
         // Find hint column indexes
         this.hintTitleCol=-1;this.hintLabelCol=-1;this.hintCol=-1;
         // Find note column indexes
-        this.noteMemberIdCol=-1;this.noteTimestampCol=-1;this.noteCol=-1;this.activeCol=-1;this.settingsCol=-1;
+        this.noteMemberIdCol=-1;this.noteTimestampCol=-1;this.noteCol=-1;this.activeCol=-1;this.settingsCol=-1;this.noteKindCol=-1;this.noteTalkCol=-1;
         this.appSettings={};
         for(var c=0;c<headers.length;c++){
             var lc=headers[c].toLowerCase();
             if(lc==='app settings')this.settingsCol=c;
+            if(lc==='notekind')this.noteKindCol=c;
+            if(lc==='notetalkseconds')this.noteTalkCol=c;
             if(lc==='hinttitle')this.hintTitleCol=c;
             if(lc==='hintlabel')this.hintLabelCol=c;
             if(lc==='hint')this.hintCol=c;
@@ -1958,7 +2010,10 @@ var App={
             // If row has noteMemberID and note filled but no member name → it's a note row
             if(noteMid&&noteText&&!memberId){
                 var ts=self.noteTimestampCol>=0?(r[self.noteTimestampCol]||'').trim():'';
-                self.notes.push({id:id,memberId:noteMid,ts:ts,note:noteText});
+                var nObj={id:id,memberId:noteMid,ts:ts,note:noteText};
+                var nk=self.noteKindCol>=0?(r[self.noteKindCol]||'').trim():'';if(nk)nObj.kind=nk;
+                var nt=self.noteTalkCol>=0?(r[self.noteTalkCol]||'').trim():'';if(nt)nObj.talk=nt;
+                self.notes.push(nObj);
             }else if(memberId||hasHuddleData){
                 var m={id:id||String(self.nextMid++),memberId:memberId,
                     name:firstVal(rowObj,['Name','Member Name','Patient Name'])||(r[2]||'').trim(),
@@ -2584,7 +2639,7 @@ var App={
         var colList=Object.keys(cols).map(function(k){return cols[k]}).sort(function(a,b){return b.bytes-a.bytes});
         var totalBytes=colList.reduce(function(a,c){return a+c.bytes},0);
         // duplicate notes: same patient + same text
-        var seen={},dupNotes=0;notes.forEach(function(n){var k=n.memberId+'\u0001'+(n.note||'').trim();if(seen[k])dupNotes++;else seen[k]=1});
+        var seen={},dupNotes=0;notes.forEach(function(n){var k=App.noteDupKey(n);if(seen[k])dupNotes++;else seen[k]=1});
         // duplicate member rows: same Member ID more than once
         var idc={},dupMembers=0;members.forEach(function(m){var id=(m.memberId||'').trim();if(!id)return;idc[id]=(idc[id]||0)+1});Object.keys(idc).forEach(function(k){if(idc[k]>1)dupMembers+=idc[k]-1});
         var emptyCols=this.droppableEmptyCols(colList).length;
@@ -2629,21 +2684,117 @@ var App={
         });
     },
     hideFileInfo:function(){document.getElementById('fileInfoModal').classList.remove('open');this.unlockScroll()},
+    /* ===== CALLS — stored as note rows (noteKind=call, noteTalkSeconds) so they live in the one CSV ===== */
+    noteDupKey:function(n){return n.memberId+'\u0001'+(n.note||'').trim()+(n.kind==='call'?'\u0001'+(n.ts||''):'')},
+    _ptFmt:null,
+    pacificInputOf:function(d){
+        if(!this._ptFmt)this._ptFmt=new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
+        var o={};this._ptFmt.formatToParts(d).forEach(function(p){o[p.type]=p.value});
+        return o.year+'-'+o.month+'-'+o.day+'T'+(o.hour==='24'?'00':o.hour)+':'+o.minute;
+    },
+    pacificInputToISO:function(s){          // "YYYY-MM-DDTHH:MM" in Pacific -> real instant
+        var guess=new Date(s);if(isNaN(guess))return new Date().toISOString();
+        var shift=Date.now()-this.pacificNow().getTime();
+        return new Date(guess.getTime()+Math.round(shift/60000)*60000).toISOString();
+    },
+    fmtPtTime:function(ts){var d=new Date(ts);if(isNaN(d))return ts||'';return d.toLocaleTimeString('en-US',{timeZone:'America/Los_Angeles',hour:'numeric',minute:'2-digit'})},
+    parseTalk:function(v){                  // "12" -> 720s, "12:30" -> 750s, "1:05:00" -> 3900s, "12m"/"12 min" -> 720s
+        v=String(v||'').trim().toLowerCase();if(!v)return '';
+        var m=v.match(/^(\d+):(\d{1,2}):(\d{1,2})$/);if(m)return String(+m[1]*3600+(+m[2])*60+(+m[3]));
+        m=v.match(/^(\d+):(\d{1,2})$/);if(m&&+m[2]<60)return String(+m[1]*60+(+m[2]));
+        m=v.match(/^(\d+(?:\.\d+)?)\s*(m|min|mins|minutes?)?$/);if(m)return String(Math.round(parseFloat(m[1])*60));
+        m=v.match(/^(\d+)\s*(s|sec|secs|seconds?)$/);if(m)return String(+m[1]);
+        return null;
+    },
+    fmtTalk:function(sec){sec=parseInt(sec,10)||0;if(!sec)return '0m';
+        var h=Math.floor(sec/3600),mn=Math.floor((sec%3600)/60),sc=sec%60;
+        if(h)return h+'h '+('0'+mn).slice(-2)+'m';
+        return mn?(mn+'m'+(sc?' '+sc+'s':'')):sc+'s'},
+    talkInputOf:function(sec){sec=parseInt(sec,10)||0;if(!sec)return '';var mn=Math.floor(sec/60),sc=sec%60;return sc?mn+':'+('0'+sc).slice(-2):String(mn)},
+    callNoteText:function(talk){return 'Call'+(talk?' \u2014 talk time '+this.fmtTalk(talk):'')},
+    openCallModal:function(noteId){
+        var m=this.findMemberByAnyId(this.notesForId);if(!m){this.toast('Open a patient first','danger');return}
+        var n=noteId?this.notes.find(function(x){return x.id===noteId}):null;
+        this._callEditId=n?n.id:null;
+        document.getElementById('callSub').textContent=' \u2014 '+(m.name||this.hName(m)||m.memberId);
+        document.getElementById('callAt').value=n?this.pacificInputOf(new Date(n.ts)):this.pacificNowInput();
+        var t=document.getElementById('callTalk');t.value=n?this.talkInputOf(n.talk):'';
+        var hint=document.getElementById('callTalkHint');hint.textContent='';hint.className='call-hint';
+        t.oninput=function(){var p=App.parseTalk(t.value);hint.className='call-hint'+(p===null?' bad':'');hint.textContent=p===null?'Not a time \u2014 use minutes (12) or min:sec (12:30)':(p?'= '+App.fmtTalk(p):'')};
+        document.getElementById('callDelBtn').style.display=n?'':'none';
+        document.getElementById('callModal').classList.add('open');
+        setTimeout(function(){t.focus()},50);
+    },
+    editCall:function(nid){this.openCallModal(nid)},
+    hideCallModal:function(){document.getElementById('callModal').classList.remove('open');this._callEditId=null},
+    saveCall:function(){
+        var at=document.getElementById('callAt').value;if(!at){this.toast('Pick a date and time','danger');return}
+        var talk=this.parseTalk(document.getElementById('callTalk').value);
+        if(talk===null){this.toast('Talk time should be minutes (12) or min:sec (12:30)','danger');return}
+        var ts=this.pacificInputToISO(at),text=this.callNoteText(talk);
+        if(this._callEditId){
+            var n=this.notes.find(function(x){return x.id===App._callEditId});
+            if(n){n.ts=ts;n.talk=talk;n.note=text;n.kind='call'}
+            this.toast('Call updated','success');
+        }else{
+            this.notes.push({id:String(this.nextNid++),memberId:this.notesForId,ts:ts,note:text,kind:'call',talk:talk});
+            this.toast('Call logged'+(talk?' \u00B7 '+this.fmtTalk(talk):''),'success');
+        }
+        this.writeNoteCSV();this.hideCallModal();this.renderNotesList();this.render();
+    },
+    deleteCallFromModal:function(){
+        var id=this._callEditId;if(!id)return;if(!confirm('Delete this call?'))return;
+        this.notes=this.notes.filter(function(n){return n.id!==id});
+        this.writeNoteCSV();this.hideCallModal();this.renderNotesList();this.render();this.toast('Call deleted','success');
+    },
+    callsOn:function(dateISO){var self=this;
+        return (this.notes||[]).filter(function(n){return n.kind==='call'&&self.pacificInputOf(new Date(n.ts)).slice(0,10)===dateISO})
+            .sort(function(a,b){return new Date(a.ts)-new Date(b.ts)})},
+    openCallLog:function(dateISO){
+        this._callLogDate=dateISO||this._callLogDate||this.todayISO();
+        document.getElementById('callLogDate').value=this._callLogDate;
+        document.getElementById('callLogModal').classList.add('open');this.lockScroll();this.renderCallLog();
+    },
+    hideCallLog:function(){document.getElementById('callLogModal').classList.remove('open');this.unlockScroll()},
+    callLogToday:function(){document.getElementById('callLogDate').value=this.todayISO();this.renderCallLog()},
+    callLogShift:function(d){var el=document.getElementById('callLogDate'),v=el.value||this.todayISO();
+        var p=v.split('-'),dt=new Date(+p[0],+p[1]-1,+p[2]+d);el.value=dt.getFullYear()+'-'+('0'+(dt.getMonth()+1)).slice(-2)+'-'+('0'+dt.getDate()).slice(-2);this.renderCallLog()},
+    renderCallLog:function(){
+        var self=this,date=document.getElementById('callLogDate').value||this.todayISO();this._callLogDate=date;
+        var calls=this.callsOn(date),body=document.getElementById('callLogBody');
+        var label=this.formatDisplayDate(date)+(date===this.todayISO()?' (today)':'');
+        if(!calls.length){body.innerHTML='<div class="notes-empty" style="padding:30px 0">No calls logged on '+this.esc(label)+'.<br>Log one from a patient\u2019s chart with the <b>Call</b> button.</div>';return}
+        var groups={},order=[];
+        calls.forEach(function(n){if(!groups[n.memberId]){groups[n.memberId]={id:n.memberId,calls:[],talk:0};order.push(n.memberId)}var g=groups[n.memberId];g.calls.push(n);g.talk+=parseInt(n.talk,10)||0});
+        var total=calls.reduce(function(a,n){return a+(parseInt(n.talk,10)||0)},0),noTalk=calls.filter(function(n){return !n.talk}).length;
+        var h='<div class="fh-grid"><div class="fh-stat"><b>'+order.length+'</b><span>People called</span></div><div class="fh-stat"><b>'+calls.length+'</b><span>Calls</span></div><div class="fh-stat"><b>'+this.fmtTalk(total)+'</b><span>Total talk time</span></div></div>';
+        h+='<div class="fh-h">'+this.esc(label)+'</div><table class="fh-table cl-table"><tr><th>Patient</th><th>Member ID</th><th>Called at (PT)</th><th class="num">Talk time</th></tr>';
+        order.forEach(function(k){var g=groups[k],m=self.findMemberByAnyId(k);
+            h+='<tr class="cl-row" data-mid="'+self.esc(k).replace(/"/g,'&quot;')+'" onclick="App.callLogOpenChart(this.getAttribute(\'data-mid\'))"><td><b>'+self.esc(m?(m.name||self.hName(m)||k):k)+'</b></td><td>'+self.esc(k)+'</td>'
+              +'<td class="cl-times">'+g.calls.map(function(n){return self.fmtPtTime(n.ts)}).join(', ')+(g.calls.length>1?' <b>('+g.calls.length+'\u00D7)</b>':'')+'</td>'
+              +'<td class="num">'+(g.talk?self.fmtTalk(g.talk):'\u2014')+'</td></tr>'});
+        h+='<tr class="cl-total"><td colspan="3">Total'+(noTalk?' <span style="font-weight:400;color:var(--t3)">('+noTalk+' call'+(noTalk!==1?'s':'')+' without talk time)</span>':'')+'</td><td class="num">'+this.fmtTalk(total)+'</td></tr></table>';
+        body.innerHTML=h;
+    },
+    callLogOpenChart:function(memberId){
+        var m=this.findMemberByAnyId(memberId);if(!m){this.toast('Patient not found','danger');return}
+        this.hideCallLog();this._returnToCallLog=true;this.showNotesModal(m.id);
+    },
     /* ===== CHECK & REPAIR (start screen) — streams the raw file, never builds the patient model ===== */
     repairClassify:function(A,r){
         var mid=A.idIdx>=0?(r[A.idIdx]||'').trim():'',note=A.noteIdx>=0?(r[A.noteIdx]||'').trim():'',nmid=A.noteMidIdx>=0?(r[A.noteMidIdx]||'').trim():'',sv=A.settingsIdx>=0?(r[A.settingsIdx]||'').trim():'';
         if(sv&&!mid&&!note)return {kind:'settings'};
-        if(nmid&&note&&!mid)return {kind:'note',key:nmid+'\u0001'+note};
+        if(nmid&&note&&!mid){var kd=A.kindIdx>=0?(r[A.kindIdx]||'').trim():'';return {kind:'note',key:nmid+'\u0001'+note+(kd==='call'?'\u0001'+(A.tsIdx>=0?(r[A.tsIdx]||'').trim():''):'')}}
         if(mid)return {kind:'member',key:mid};
         return {kind:'other'};
     },
     repairAnalyze:function(text){
-        var A={header:[],cols:0,rows:0,memberRows:0,noteRows:0,settingsRows:0,otherRows:0,nested:[],teamCols:0,teams:{},dupNotes:0,dupMembers:0,fill:[],bytes:[],idIdx:-1,noteIdx:-1,noteMidIdx:-1,settingsIdx:-1,blankHeaders:0};
+        var A={header:[],cols:0,rows:0,memberRows:0,noteRows:0,settingsRows:0,otherRows:0,nested:[],teamCols:0,teams:{},dupNotes:0,dupMembers:0,fill:[],bytes:[],idIdx:-1,noteIdx:-1,noteMidIdx:-1,settingsIdx:-1,kindIdx:-1,tsIdx:-1,blankHeaders:0};
         var ids={},nk={},self=this;
         csvScan(text,function(r,idx){
             if(idx===0){A.header=r.map(function(x){return x.trim()});A.cols=r.length;A.fill=new Array(r.length).fill(0);A.bytes=new Array(r.length).fill(0);
                 A.header.forEach(function(h,i){var lc=h.toLowerCase();
-                    if(lc==='member id')A.idIdx=i;else if(lc==='note')A.noteIdx=i;else if(lc==='notememberid')A.noteMidIdx=i;else if(lc==='app settings')A.settingsIdx=i;
+                    if(lc==='member id')A.idIdx=i;else if(lc==='note')A.noteIdx=i;else if(lc==='notememberid')A.noteMidIdx=i;else if(lc==='app settings')A.settingsIdx=i;else if(lc==='notekind')A.kindIdx=i;else if(lc==='notetimestamp')A.tsIdx=i;
                     if(!h){A.blankHeaders++;return}
                     if(isRunawayCol(h))A.nested.push(i);else if(h.charAt(0)==='['){A.teamCols++;var m=/^\[(.+?)\]/.exec(h);if(m)A.teams[m[1]]=1}});
                 return}
@@ -2740,7 +2891,7 @@ var App={
     hideRepair:function(){document.getElementById('repairModal').classList.remove('open');this.unlockScroll()},
     fixDupNotes:function(){
         var seen={},keep=[],removed=0;
-        (this.notes||[]).forEach(function(n){var k=n.memberId+'\u0001'+(n.note||'').trim();if(seen[k]){removed++;return}seen[k]=1;keep.push(n)});
+        (this.notes||[]).forEach(function(n){var k=App.noteDupKey(n);if(seen[k]){removed++;return}seen[k]=1;keep.push(n)});
         if(!removed)return;if(!confirm('Remove '+removed+' duplicate notes? The first copy of each is kept.'))return;
         this.notes=keep;this.writeMemberCSV();this.render();this.toast('Removed '+removed+' duplicate notes','success');this.showFileInfo();
     },
@@ -2755,7 +2906,7 @@ var App={
     // empty columns that are safe to drop: not built-in member/note/huddle/team columns
     droppableEmptyCols:function(colList){
         var core=['id','member id','name','tier','next call','call type','case manager','cm','active','notememberid','notetimestamp','note','app settings','active team',
-            'hinttitle','hintlabel','hint','review during daily','daily review until','reminder at','reminder note'];
+            'hinttitle','hintlabel','hint','review during daily','daily review until','reminder at','reminder note','notekind','notetalkseconds'];
         return colList.filter(function(c){return !c.filled&&c.name!=='Note (rows)'}).map(function(c){return c.name})
             .filter(function(h){var lc=h.toLowerCase();return core.indexOf(lc)===-1&&!isHuddleCol(h)&&HUDDLE_PREP_COLS.indexOf(h)===-1&&HUDDLE_COLS.indexOf(h)===-1&&HUDDLE_ID_COLS.indexOf(h)===-1&&lc.indexOf('[team ')!==0});
     },
@@ -3294,6 +3445,7 @@ var App={
         document.getElementById('notesModal').classList.remove('open');this.unlockScroll();this.notesForId=null;
         if(this._returnToCalDay){this._returnToCalDay=false;this.renderCalendarMembers()}
         if(this._returnToReminder){var rid=this._returnToReminder;this._returnToReminder=null;this.openReminderModal(rid)}
+        if(this._returnToCallLog){this._returnToCallLog=false;this.openCallLog(this._callLogDate)}
     },
     _returnToCalDay:false,
     openNotesFromCal:function(id){
@@ -3305,7 +3457,7 @@ var App={
         var list=this.getNotesFor(this.notesForId),self=this;
         var el=document.getElementById('notesList');
         if(!list.length){el.innerHTML='<div class="notes-empty">No notes yet.<br>Write one on the left.</div>';return}
-        el.innerHTML=list.map(function(n){return '<div class="note-card" id="nc-'+n.id+'"><div class="note-head"><span class="note-time">'+self.fmtTime(n.ts)+'</span><div><button class="note-edit" onclick="App.editNote(\''+n.id+'\')" title="Edit">&#9998;</button> <button class="note-del" onclick="App.deleteNote(\''+n.id+'\')" title="Delete">&times;</button></div></div><div class="note-text-wrap"><div class="note-text">'+self.esc(n.note)+'</div></div></div>'}).join('');
+        el.innerHTML=list.map(function(n){var isCall=n.kind==='call';return '<div class="note-card'+(isCall?' note-call':'')+'" id="nc-'+n.id+'"><div class="note-head"><span class="note-time">'+self.fmtTime(n.ts)+(isCall?'<span class="note-call-badge">'+App.icon('phone')+(n.talk?App.fmtTalk(n.talk):'Call')+'</span>':'')+'</span><div><button class="note-edit" onclick="App.'+(isCall?'editCall':'editNote')+'(\''+n.id+'\')" title="Edit">&#9998;</button> <button class="note-del" onclick="App.deleteNote(\''+n.id+'\')" title="Delete">&times;</button></div></div><div class="note-text-wrap"><div class="note-text">'+self.esc(n.note)+'</div></div></div>'}).join('');
     },
     showDeleteModal:function(id){this.delId=id;var m=this.members.find(function(x){return x.id===id});document.getElementById('delName').textContent=m?m.name:'this member';document.getElementById('deleteModal').classList.add('open');this.lockScroll()},
     hideDeleteModal:function(){document.getElementById('deleteModal').classList.remove('open');this.unlockScroll();this.delId=null},
@@ -5609,7 +5761,7 @@ var App={
                     var nmid=String(r[0]||'').trim();
                     var ts=String(r[1]||'').trim();
                     var note=String(r[2]||'').trim();
-                    if(nmid&&note)self.notes.push({id:String(i+1),memberId:nmid,ts:ts,note:note});
+                    if(nmid&&note){var xo={id:String(i+1),memberId:nmid,ts:ts,note:note};var xk=String(r[3]||'').trim(),xt=String(r[4]||'').trim();if(xk)xo.kind=xk;if(xt)xo.talk=xt;self.notes.push(xo)}
                 });
                 var nmx=0;self.notes.forEach(function(n){var v=parseInt(n.id);if(!isNaN(v)&&v>nmx)nmx=v});self.nextNid=nmx+1;
             }
@@ -5658,8 +5810,8 @@ var App={
         if(!this.xlMode||!this.excelWb)return Promise.resolve();
         var map=this.xlMap||this.getXlMap();
         if(map.noteSheet<0)return Promise.resolve();
-        var aoa=[['Member ID','Timestamp','Note']];
-        this.notes.forEach(function(n){aoa.push([n.memberId,n.ts,n.note])});
+        var aoa=[['Member ID','Timestamp','Note','Kind','Talk Seconds']];
+        this.notes.forEach(function(n){aoa.push([n.memberId,n.ts,n.note,n.kind||'',n.talk||''])});
         var nws=XLSX.utils.aoa_to_sheet(aoa);
         this.excelWb.Sheets[this.excelWb.SheetNames[map.noteSheet]]=nws;
         return this.saveExcelFile();
